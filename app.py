@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 
+st.set_option("magic.enabled", False)
+
 st.set_page_config(
     page_title="Monthly Visit Log",
     page_icon="🧹",
@@ -100,8 +102,12 @@ RATE_CARD = [
     {"id": "lo_whe_swp", "account": "Lowe's", "location": "Wheatlands", "service": "Sweeping", "rate": 50.00},
 ]
 
-if "visits" not in st.session_state:
-    st.session_state.visits = {row["id"]: [] for row in RATE_CARD}
+# Always ensure every RATE_CARD id exists in session_state.visits
+if "visits" not in st.session_state or not isinstance(st.session_state.visits, dict):
+    st.session_state.visits = {}
+for row in RATE_CARD:
+    st.session_state.visits.setdefault(row["id"], [])
+
 if "open_account" not in st.session_state:
     st.session_state.open_account = None
 if "open_calendar" not in st.session_state:
@@ -114,11 +120,10 @@ if "extra_temp_days" not in st.session_state:
 
 def render_calendar_picker(selected_days: list[int], year: int, month_num: int, key_prefix: str) -> list[int]:
     """Renders a 7-column Sun-Sat calendar grid where tapping a day toggles it on/off and stays open."""
-    cal = calendar.Calendar(firstweekday=6)  # Start weeks on Sunday
+    cal = calendar.Calendar(firstweekday=6)
     weeks = cal.monthdayscalendar(year, month_num)
     updated = set(selected_days)
 
-    # Day-of-week header row
     hdr_cols = st.columns(7)
     for i, day_name in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]):
         hdr_cols[i].markdown(
@@ -126,7 +131,6 @@ def render_calendar_picker(selected_days: list[int], year: int, month_num: int, 
             unsafe_allow_html=True,
         )
 
-    # Calendar date rows
     for week in weeks:
         cols = st.columns(7)
         for d_idx, day_num in enumerate(week):
@@ -163,7 +167,7 @@ def build_summary_df() -> pd.DataFrame:
             }
         )
     for extra in st.session_state.extra_items:
-        days = sorted(extra["days"])
+        days = sorted(extra.get("days", []))
         qty = len(days)
         rows.append(
             {
@@ -184,7 +188,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
-    # Header Banner
     pdf.set_fill_color(30, 41, 59)
     pdf.rect(10, 10, 196, 22, "F")
     pdf.set_text_color(255, 255, 255)
@@ -199,7 +202,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(50, 8, f"Invoice #{invoice_num}", align="R")
 
-    # Summary KPIs
     total_visits = int(active_df["Visits"].sum()) if not active_df.empty else 0
     total_amount = float(active_df["Amount"].sum()) if not active_df.empty else 0.0
 
@@ -209,7 +211,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     pdf.cell(98, 8, f"Total Verified Visits: {total_visits}", border=1)
     pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
 
-    # Table Header
     pdf.set_xy(10, 48)
     pdf.set_fill_color(15, 76, 129)
     pdf.set_text_color(255, 255, 255)
@@ -221,7 +222,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
         pdf.cell(w, 8, h, border=1, fill=True, align=align)
     pdf.ln()
 
-    # Table Rows
     pdf.set_text_color(15, 23, 42)
     pdf.set_font("Helvetica", "", 8.5)
     fill = False
@@ -236,7 +236,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
         pdf.ln()
         fill = not fill
 
-    # Grand Total Row
     pdf.set_fill_color(226, 232, 240)
     pdf.set_font("Helvetica", "B", 9.5)
     pdf.cell(col_w[0], 8, "TOTAL", border=1, fill=True, align="R")
@@ -335,18 +334,17 @@ accounts = ["King Soopers", "Lowe's", "Kohl's", "Best Buy", "Highlands Ranch / S
 
 for acct in accounts:
     acct_items = [x for x in RATE_CARD if x["account"] == acct]
-    acct_visits = sum(len(st.session_state.visits[x["id"]]) for x in acct_items)
-    acct_dollars = sum(len(st.session_state.visits[x["id"]]) * x["rate"] for x in acct_items)
+    acct_visits = sum(len(st.session_state.visits.get(x["id"], [])) for x in acct_items)
+    acct_dollars = sum(len(st.session_state.visits.get(x["id"], [])) * x["rate"] for x in acct_items)
     badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
 
-    # Stay expanded while this account is being worked on, or if any of its calendars is open
     is_acct_open = (st.session_state.open_account == acct) or any(
         st.session_state.open_calendar == x["id"] for x in acct_items
     )
 
     with st.expander(f"{acct}{badge}", expanded=is_acct_open):
         for item in acct_items:
-            current_days = st.session_state.visits[item["id"]]
+            current_days = st.session_state.visits.get(item["id"], [])
             is_cal_open = st.session_state.open_calendar == item["id"]
 
             if current_days:
@@ -376,14 +374,12 @@ for acct in accounts:
                         st.rerun()
 
                     if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
-                        # Close only the calendar; keep the parent account tab open for the next line item
                         st.session_state.open_account = acct
                         st.session_state.open_calendar = None
                         st.rerun()
 
             st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
 
-        # Collapse the entire category only when the tech finishes all lines in this account
         if st.button(f"Done with {acct} ▲", key=f"done_{acct}", use_container_width=True):
             st.session_state.open_account = None
             st.session_state.open_calendar = None
@@ -432,6 +428,15 @@ with st.expander(
             st.rerun()
         else:
             st.warning("Enter a job description and tap at least one date on the calendar.")
+
+    if st.session_state.extra_items:
+        st.markdown("**Added One-Off Jobs:**")
+        for idx, extra in enumerate(st.session_state.extra_items):
+            c1, c2 = st.columns([4, 1])
+            c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s) @ ${extra['rate']:,.2f}")
+            if c2.button("🗑️", key=f"del_extra_{idx}"):
+                st.session_state.extra_items.pop(idx)
+                st.rerun()
 
 st.divider()
 
