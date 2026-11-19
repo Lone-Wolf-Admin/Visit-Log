@@ -6,8 +6,6 @@ import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 
-st.set_option("magic.enabled", False)
-
 st.set_page_config(
     page_title="Monthly Visit Log",
     page_icon="🧹",
