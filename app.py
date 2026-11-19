@@ -102,6 +102,8 @@ RATE_CARD = [
 
 if "visits" not in st.session_state:
     st.session_state.visits = {row["id"]: [] for row in RATE_CARD}
+if "open_calendar" not in st.session_state:
+    st.session_state.open_calendar = None
 if "extra_items" not in st.session_state:
     st.session_state.extra_items = []
 if "extra_temp_days" not in st.session_state:
@@ -109,7 +111,7 @@ if "extra_temp_days" not in st.session_state:
 
 
 def render_calendar_picker(selected_days: list[int], year: int, month_num: int, key_prefix: str) -> list[int]:
-    """Renders a 7-column Sun-Sat calendar grid where tapping a day toggles it on/off."""
+    """Renders a 7-column Sun-Sat calendar grid where tapping a day toggles it on/off and stays open."""
     cal = calendar.Calendar(firstweekday=6)  # Start weeks on Sunday
     weeks = cal.monthdayscalendar(year, month_num)
     updated = set(selected_days)
@@ -123,7 +125,7 @@ def render_calendar_picker(selected_days: list[int], year: int, month_num: int, 
         )
 
     # Calendar date rows
-    for w_idx, week in enumerate(weeks):
+    for week in weeks:
         cols = st.columns(7)
         for d_idx, day_num in enumerate(week):
             with cols[d_idx]:
@@ -272,7 +274,7 @@ def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str
 
 # --- APP HEADER ---
 st.title("🧹 Backwoods Monthly Log")
-st.caption("Open a store group below, tap 'Tap to pick dates', and tap the calendar days you visited.")
+st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
 
 now = datetime.now()
 month_names = list(calendar.month_name)[1:]
@@ -308,44 +310,80 @@ for acct in accounts:
     acct_dollars = sum(len(st.session_state.visits[x["id"]]) * x["rate"] for x in acct_items)
     badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
 
-    with st.expander(f"{acct}{badge}", expanded=False):
+    # Keep the parent store group open if one of its calendars is currently open
+    has_open_child = any(st.session_state.open_calendar == x["id"] for x in acct_items)
+
+    with st.expander(f"{acct}{badge}", expanded=has_open_child):
         for item in acct_items:
             current_days = st.session_state.visits[item["id"]]
-            count_text = f" ({len(current_days)} selected)" if current_days else ""
-            st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit){count_text}")
+            is_cal_open = st.session_state.open_calendar == item["id"]
 
-            with st.expander(f"📅 Tap to pick dates{count_text}", expanded=False):
-                new_days = render_calendar_picker(
-                    selected_days=current_days,
-                    year=selected_year,
-                    month_num=selected_month_num,
-                    key_prefix=item["id"],
+            if current_days:
+                days_preview = ", ".join(str(d) for d in current_days)
+                st.markdown(
+                    f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)  \n"
+                    f"Selected ({len(current_days)}): `{days_preview}`"
                 )
-                if new_days != current_days:
-                    st.session_state.visits[item["id"]] = new_days
+            else:
+                st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
+
+            if not is_cal_open:
+                if st.button("📅 Tap to pick dates", key=f"open_{item['id']}", use_container_width=True):
+                    st.session_state.open_calendar = item["id"]
                     st.rerun()
+            else:
+                with st.container(border=True):
+                    new_days = render_calendar_picker(
+                        selected_days=current_days,
+                        year=selected_year,
+                        month_num=selected_month_num,
+                        key_prefix=item["id"],
+                    )
+                    if new_days != current_days:
+                        st.session_state.visits[item["id"]] = new_days
+                        st.rerun()
+
+                    if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
+                        st.session_state.open_calendar = None
+                        st.rerun()
+
+            st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
 
 # Optional One-Off / Bulk Trash section
-with st.expander("➕ Add One-Off Job (e.g., Bulk Trash)"):
+with st.expander("➕ Add One-Off Job (e.g., Bulk Trash)", expanded=(st.session_state.open_calendar == "extra_job")):
     ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
     ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
-    with st.expander("📅 Tap to pick dates", expanded=True):
-        new_ex_days = render_calendar_picker(
-            selected_days=st.session_state.extra_temp_days,
-            year=selected_year,
-            month_num=selected_month_num,
-            key_prefix="extra_job",
-        )
-        if new_ex_days != st.session_state.extra_temp_days:
-            st.session_state.extra_temp_days = new_ex_days
-            st.rerun()
 
-    if st.button("Add One-Off Job to Log"):
+    if st.session_state.extra_temp_days:
+        st.caption(f"Selected days: {', '.join(str(d) for d in st.session_state.extra_temp_days)}")
+
+    if st.session_state.open_calendar != "extra_job":
+        if st.button("📅 Tap to pick dates", key="open_extra_job", use_container_width=True):
+            st.session_state.open_calendar = "extra_job"
+            st.rerun()
+    else:
+        with st.container(border=True):
+            new_ex_days = render_calendar_picker(
+                selected_days=st.session_state.extra_temp_days,
+                year=selected_year,
+                month_num=selected_month_num,
+                key_prefix="extra_job",
+            )
+            if new_ex_days != st.session_state.extra_temp_days:
+                st.session_state.extra_temp_days = new_ex_days
+                st.rerun()
+
+            if st.button("✅ OK", key="ok_extra_job", type="primary", use_container_width=True):
+                st.session_state.open_calendar = None
+                st.rerun()
+
+    if st.button("Add One-Off Job to Log", use_container_width=True):
         if ex_name and st.session_state.extra_temp_days:
             st.session_state.extra_items.append(
                 {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
             )
             st.session_state.extra_temp_days = []
+            st.session_state.open_calendar = None
             st.rerun()
         else:
             st.warning("Enter a job description and tap at least one date on the calendar.")
