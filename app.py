@@ -1,3 +1,4 @@
+import calendar
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
@@ -12,17 +13,43 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mobile-first CSS for large thumb-friendly controls on Android
+# Mobile-first CSS: keeps the 7-column calendar grid on 1 row on Android screens and styles green selected dates
 st.markdown(
     """
     <style>
     .block-container { padding-top: 1.2rem; padding-bottom: 3rem; max-width: 680px; }
-    div[data-testid="stButton"] button {
-        min-height: 3.1rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        border-radius: 10px;
+
+    /* Force 7-column calendar rows to stay side-by-side on mobile phones instead of stacking */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stColumn"]:nth-child(7)) {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
     }
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stColumn"]:nth-child(7)) > div[data-testid="stColumn"] {
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        width: auto !important;
+    }
+
+    /* Calendar day buttons */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stColumn"]:nth-child(7)) button {
+        min-height: 2.6rem !important;
+        padding: 0.15rem 0 !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+    }
+
+    /* Highlight selected calendar dates in green */
+    div[data-testid="stHorizontalBlock"]:has(div[data-testid="stColumn"]:nth-child(7)) button[kind="primary"] {
+        background-color: #16a34a !important;
+        border-color: #15803d !important;
+        color: #ffffff !important;
+    }
+
+    /* Main action buttons */
     div[data-testid="stDownloadButton"] button {
         min-height: 3.2rem;
         font-size: 1.05rem;
@@ -30,7 +57,6 @@ st.markdown(
         border-radius: 10px;
         width: 100%;
     }
-    .stMultiSelect div[data-baseweb="select"] { min-height: 48px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -78,6 +104,43 @@ if "visits" not in st.session_state:
     st.session_state.visits = {row["id"]: [] for row in RATE_CARD}
 if "extra_items" not in st.session_state:
     st.session_state.extra_items = []
+if "extra_temp_days" not in st.session_state:
+    st.session_state.extra_temp_days = []
+
+
+def render_calendar_picker(selected_days: list[int], year: int, month_num: int, key_prefix: str) -> list[int]:
+    """Renders a 7-column Sun-Sat calendar grid where tapping a day toggles it on/off."""
+    cal = calendar.Calendar(firstweekday=6)  # Start weeks on Sunday
+    weeks = cal.monthdayscalendar(year, month_num)
+    updated = set(selected_days)
+
+    # Day-of-week header row
+    hdr_cols = st.columns(7)
+    for i, day_name in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]):
+        hdr_cols[i].markdown(
+            f"<div style='text-align:center; font-size:0.75rem; font-weight:700; color:#64748b;'>{day_name}</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Calendar date rows
+    for w_idx, week in enumerate(weeks):
+        cols = st.columns(7)
+        for d_idx, day_num in enumerate(week):
+            with cols[d_idx]:
+                if day_num == 0:
+                    st.markdown("<div style='height:2.6rem;'></div>", unsafe_allow_html=True)
+                else:
+                    is_selected = day_num in updated
+                    label = f"✓{day_num}" if is_selected else str(day_num)
+                    btn_type = "primary" if is_selected else "secondary"
+                    if st.button(label, key=f"{key_prefix}_d{day_num}", type=btn_type):
+                        if is_selected:
+                            updated.remove(day_num)
+                        else:
+                            updated.add(day_num)
+                        return sorted(updated)
+
+    return sorted(updated)
 
 
 def build_summary_df() -> pd.DataFrame:
@@ -209,14 +272,20 @@ def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str
 
 # --- APP HEADER ---
 st.title("🧹 Backwoods Monthly Log")
-st.caption("Tap each location below and pick the days you visited. Totals calculate automatically.")
+st.caption("Open a store group below, tap 'Tap to pick dates', and tap the calendar days you visited.")
 
-col_m, col_i = st.columns([2, 1])
+now = datetime.now()
+month_names = list(calendar.month_name)[1:]
+col_m, col_y, col_i = st.columns([2, 1.3, 1.3])
 with col_m:
-    default_month = datetime.now().strftime("%B %Y")
-    billing_month = st.text_input("Billing Month", value=default_month)
+    selected_month_name = st.selectbox("Month", month_names, index=now.month - 1)
+with col_y:
+    selected_year = st.selectbox("Year", [now.year - 1, now.year, now.year + 1], index=1)
 with col_i:
     invoice_num = st.text_input("Invoice #", value="0026")
+
+selected_month_num = month_names.index(selected_month_name) + 1
+billing_month = f"{selected_month_name} {selected_year}"
 
 # --- LIVE SUMMARY BANNER ---
 summary_df = build_summary_df()
@@ -229,9 +298,8 @@ k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
 
 st.divider()
 
-# --- STEP 1: TAP DAYS VISITED BY ACCOUNT ---
-st.subheader("1. Select Days Visited")
-days_options = list(range(1, 32))
+# --- STEP 1: TAP DATES VISITED BY ACCOUNT ---
+st.subheader("1. Select Dates Visited")
 accounts = ["King Soopers", "Lowe's", "Kohl's", "Best Buy", "Highlands Ranch / Safeway"]
 
 for acct in accounts:
@@ -240,37 +308,47 @@ for acct in accounts:
     acct_dollars = sum(len(st.session_state.visits[x["id"]]) * x["rate"] for x in acct_items)
     badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
 
-    with st.expander(f"{acct}{badge}", expanded=(acct == "Best Buy")):
+    with st.expander(f"{acct}{badge}", expanded=False):
         for item in acct_items:
-            c_left, c_right = st.columns([3, 1])
-            with c_left:
-                st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
-            with c_right:
-                if st.button("Weekly (Fri)", key=f"wk_{item['id']}", help="Quick-fill Fridays (4, 11, 18, 25)"):
-                    st.session_state.visits[item["id"]] = [4, 11, 18, 25]
-                    st.rerun()
+            current_days = st.session_state.visits[item["id"]]
+            count_text = f" ({len(current_days)} selected)" if current_days else ""
+            st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit){count_text}")
 
-            selected = st.multiselect(
-                f"Days visited ({item['location']} {item['service']})",
-                options=days_options,
-                default=st.session_state.visits[item["id"]],
-                key=f"ms_{item['id']}",
-                label_visibility="collapsed",
-                placeholder="Tap to pick day numbers (1–31)...",
-            )
-            st.session_state.visits[item["id"]] = selected
+            with st.expander(f"📅 Tap to pick dates{count_text}", expanded=False):
+                new_days = render_calendar_picker(
+                    selected_days=current_days,
+                    year=selected_year,
+                    month_num=selected_month_num,
+                    key_prefix=item["id"],
+                )
+                if new_days != current_days:
+                    st.session_state.visits[item["id"]] = new_days
+                    st.rerun()
 
 # Optional One-Off / Bulk Trash section
 with st.expander("➕ Add One-Off Job (e.g., Bulk Trash)"):
     ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
     ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
-    ex_days = st.multiselect("Day(s) Completed", options=days_options, key="ex_days_picker")
+    with st.expander("📅 Tap to pick dates", expanded=True):
+        new_ex_days = render_calendar_picker(
+            selected_days=st.session_state.extra_temp_days,
+            year=selected_year,
+            month_num=selected_month_num,
+            key_prefix="extra_job",
+        )
+        if new_ex_days != st.session_state.extra_temp_days:
+            st.session_state.extra_temp_days = new_ex_days
+            st.rerun()
+
     if st.button("Add One-Off Job to Log"):
-        if ex_name and ex_days:
-            st.session_state.extra_items.append({"name": ex_name, "rate": ex_rate, "days": ex_days})
+        if ex_name and st.session_state.extra_temp_days:
+            st.session_state.extra_items.append(
+                {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
+            )
+            st.session_state.extra_temp_days = []
             st.rerun()
         else:
-            st.warning("Enter a job description and at least one day.")
+            st.warning("Enter a job description and tap at least one date on the calendar.")
 
 st.divider()
 
@@ -279,7 +357,7 @@ st.subheader("2. Download PDF & Notify Drew")
 active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
 
 if active_preview.empty:
-    st.info("No visits selected yet. Open any store group above and tap the days you visited.")
+    st.info("No visits selected yet. Open any store group above and tap 'Tap to pick dates'.")
 else:
     st.dataframe(active_preview, use_container_width=True, hide_index=True)
 
