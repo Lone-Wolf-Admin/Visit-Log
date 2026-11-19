@@ -274,7 +274,7 @@ def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str
 
 
 # --- APP HEADER ---
-st.title("🧹 Backwoods Monthly Log")
+st.title("🧹Monthly Log")
 st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
 
 now = datetime.now()
