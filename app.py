@@ -206,4 +206,232 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str)
     pdf.set_xy(10, 36)
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(98, 8, f"Total Verified Visits: {total_visits}", border=1)
-    pdf.cell(98, 8, f"Total Invoice
+    pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
+pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
+
+    # Table Header
+    pdf.set_xy(10, 48)
+    pdf.set_fill_color(15, 76, 129)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 9)
+    col_w = [68, 14, 20, 24, 70]
+    headers = ["Service Line Item", "Visits", "Rate", "Amount", "Days Visited"]
+    for w, h in zip(col_w, headers):
+        align = "R" if h in ("Visits", "Rate", "Amount") else "L"
+        pdf.cell(w, 8, h, border=1, fill=True, align=align)
+    pdf.ln()
+
+    # Table Rows
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_font("Helvetica", "", 8.5)
+    fill = False
+    for _, r in active_df.iterrows():
+        pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
+        dates_str = r["Dates Visited"] if len(r["Dates Visited"]) <= 44 else r["Dates Visited"][:41] + "..."
+        pdf.cell(col_w[0], 7, r["Line Item"][:38], border=1, fill=True)
+        pdf.cell(col_w[1], 7, str(int(r["Visits"])), border=1, fill=True, align="R")
+        pdf.cell(col_w[2], 7, f"${r['Rate']:,.2f}", border=1, fill=True, align="R")
+        pdf.cell(col_w[3], 7, f"${r['Amount']:,.2f}", border=1, fill=True, align="R")
+        pdf.cell(col_w[4], 7, dates_str, border=1, fill=True)
+        pdf.ln()
+        fill = not fill
+
+    # Grand Total Row
+    pdf.set_fill_color(226, 232, 240)
+    pdf.set_font("Helvetica", "B", 9.5)
+    pdf.cell(col_w[0], 8, "TOTAL", border=1, fill=True, align="R")
+    pdf.cell(col_w[1], 8, str(total_visits), border=1, fill=True, align="R")
+    pdf.cell(col_w[2], 8, "", border=1, fill=True)
+    pdf.cell(col_w[3], 8, f"${total_amount:,.2f}", border=1, fill=True, align="R")
+    pdf.cell(col_w[4], 8, "Attach to Novo Invoice", border=1, fill=True)
+
+    return bytes(pdf.output())
+
+
+def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str, total_visits: int, total_amount: float):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Backwoods Services Log Ready — {billing_month} (Inv #{invoice_num} | ${total_amount:,.2f})"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content(
+        f"Hi Drew,\n\n"
+        f"Backwoods Services has completed the monthly visit log for {billing_month}.\n\n"
+        f"- Invoice #: {invoice_num}\n"
+        f"- Total Verified Visits: {total_visits}\n"
+        f"- Total Invoice Amount: ${total_amount:,.2f}\n\n"
+        f"The clean PDF visit log is attached to this email for your records and photo audit.\n"
+    )
+    filename = f"Backwoods_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=filename)
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
+# --- APP HEADER ---
+st.title("🧹 Backwoods Monthly Log")
+st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
+
+now = datetime.now()
+month_names = list(calendar.month_name)[1:]
+col_m, col_y, col_i = st.columns([2, 1.3, 1.3])
+with col_m:
+    selected_month_name = st.selectbox("Month", month_names, index=now.month - 1)
+with col_y:
+    selected_year = st.selectbox("Year", [now.year - 1, now.year, now.year + 1], index=1)
+with col_i:
+    invoice_num = st.text_input("Invoice #", value="0026")
+
+selected_month_num = month_names.index(selected_month_name) + 1
+billing_month = f"{selected_month_name} {selected_year}"
+
+# --- LIVE SUMMARY BANNER ---
+summary_df = build_summary_df()
+tot_visits = int(summary_df["Visits"].sum())
+tot_amt = float(summary_df["Amount"].sum())
+
+k1, k2 = st.columns(2)
+k1.metric("Total Visits Logged", f"{tot_visits}")
+k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
+
+st.divider()
+
+# --- STEP 1: TAP DATES VISITED BY ACCOUNT ---
+st.subheader("1. Select Dates Visited")
+accounts = ["King Soopers", "Lowe's", "Kohl's", "Best Buy", "Highlands Ranch / Safeway"]
+
+for acct in accounts:
+    acct_items = [x for x in RATE_CARD if x["account"] == acct]
+    acct_visits = sum(len(st.session_state.visits[x["id"]]) for x in acct_items)
+    acct_dollars = sum(len(st.session_state.visits[x["id"]]) * x["rate"] for x in acct_items)
+    badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
+
+    # Stay expanded while this account is being worked on, or if any of its calendars is open
+    is_acct_open = (st.session_state.open_account == acct) or any(
+        st.session_state.open_calendar == x["id"] for x in acct_items
+    )
+
+    with st.expander(f"{acct}{badge}", expanded=is_acct_open):
+        for item in acct_items:
+            current_days = st.session_state.visits[item["id"]]
+            is_cal_open = st.session_state.open_calendar == item["id"]
+
+            if current_days:
+                days_preview = ", ".join(str(d) for d in current_days)
+                st.markdown(
+                    f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)  \n"
+                    f"Selected ({len(current_days)}): `{days_preview}`"
+                )
+            else:
+                st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
+
+            if not is_cal_open:
+                if st.button("📅 Tap to pick dates", key=f"open_{item['id']}", use_container_width=True):
+                    st.session_state.open_account = acct
+                    st.session_state.open_calendar = item["id"]
+                    st.rerun()
+            else:
+                with st.container(border=True):
+                    new_days = render_calendar_picker(
+                        selected_days=current_days,
+                        year=selected_year,
+                        month_num=selected_month_num,
+                        key_prefix=item["id"],
+                    )
+                    if new_days != current_days:
+                        st.session_state.visits[item["id"]] = new_days
+                        st.rerun()
+
+                    if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
+                        # Close only the calendar; keep the parent account tab open for the next line item
+                        st.session_state.open_account = acct
+                        st.session_state.open_calendar = None
+                        st.rerun()
+
+            st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
+
+        # Collapse the entire category only when the tech finishes all lines in this account
+        if st.button(f"Done with {acct} ▲", key=f"done_{acct}", use_container_width=True):
+            st.session_state.open_account = None
+            st.session_state.open_calendar = None
+            st.rerun()
+
+# Optional One-Off / Bulk Trash section
+with st.expander(
+    "➕ Add One-Off Job (e.g., Bulk Trash)",
+    expanded=(st.session_state.open_account == "extra_job" or st.session_state.open_calendar == "extra_job"),
+):
+    ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
+    ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
+
+    if st.session_state.extra_temp_days:
+        st.caption(f"Selected days: {', '.join(str(d) for d in st.session_state.extra_temp_days)}")
+
+    if st.session_state.open_calendar != "extra_job":
+        if st.button("📅 Tap to pick dates", key="open_extra_job", use_container_width=True):
+            st.session_state.open_account = "extra_job"
+            st.session_state.open_calendar = "extra_job"
+            st.rerun()
+    else:
+        with st.container(border=True):
+            new_ex_days = render_calendar_picker(
+                selected_days=st.session_state.extra_temp_days,
+                year=selected_year,
+                month_num=selected_month_num,
+                key_prefix="extra_job",
+            )
+            if new_ex_days != st.session_state.extra_temp_days:
+                st.session_state.extra_temp_days = new_ex_days
+                st.rerun()
+
+            if st.button("✅ OK", key="ok_extra_job", type="primary", use_container_width=True):
+                st.session_state.open_calendar = None
+                st.rerun()
+
+    if st.button("Add One-Off Job to Log", use_container_width=True):
+        if ex_name and st.session_state.extra_temp_days:
+            st.session_state.extra_items.append(
+                {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
+            )
+            st.session_state.extra_temp_days = []
+            st.session_state.open_calendar = None
+            st.session_state.open_account = None
+            st.rerun()
+        else:
+            st.warning("Enter a job description and tap at least one date on the calendar.")
+
+st.divider()
+
+# --- STEP 2: REVIEW & SUBMIT ---
+st.subheader("2. Download PDF & Notify Drew")
+active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
+
+if active_preview.empty:
+    st.info("No visits selected yet. Open any store group above and tap 'Tap to pick dates'.")
+else:
+    st.dataframe(active_preview, use_container_width=True, hide_index=True)
+
+    pdf_bytes = generate_invoice_pdf(summary_df, billing_month, invoice_num)
+    pdf_filename = f"Backwoods_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+
+    st.download_button(
+        label="📄 1. Download PDF to Attach in Novo",
+        data=pdf_bytes,
+        file_name=pdf_filename,
+        mime="application/pdf",
+        type="secondary",
+    )
+
+    if st.button("📧 2. Email Completed Log to Drew", type="primary", use_container_width=True):
+        try:
+            send_completion_email(pdf_bytes, billing_month, invoice_num, tot_visits, tot_amt)
+            st.success(f"Sent! Drew received the {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits).")
+        except Exception as e:
+            st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
