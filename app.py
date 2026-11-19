@@ -280,7 +280,7 @@ def send_completion_email(
         f"- Invoice #: {invoice_num}\n"
         f"- Total Verified Visits: {total_visits}\n"
         f"- Total Invoice Amount: ${total_amount:,.2f}\n\n"
-        f"The clean PDF visit log is attached to this email for your records, Novo invoice attachment, and photo audit.\n"
+        f"The clean PDF visit log is attached to this email for your records, attach a copy to your invoice and bill the total as shown on this document. All payments require valid proof of service and may not be paid if proof is not rendered.\n"
     )
     filename = f"Monthly_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
     msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=filename)
