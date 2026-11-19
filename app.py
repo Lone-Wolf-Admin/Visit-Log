@@ -207,7 +207,6 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str)
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(98, 8, f"Total Verified Visits: {total_visits}", border=1)
     pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
-pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
 
     # Table Header
     pdf.set_xy(10, 48)
