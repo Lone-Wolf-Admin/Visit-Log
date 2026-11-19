@@ -246,24 +246,35 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str)
     return bytes(pdf.output())
 
 
-def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str, total_visits: int, total_amount: float):
+def send_completion_email(
+    pdf_bytes: bytes,
+    billing_month: str,
+    invoice_num: str,
+    total_visits: int,
+    total_amount: float,
+    tech_copy_email: str = "",
+):
     smtp_host = st.secrets["email"]["smtp_host"]
     smtp_port = int(st.secrets["email"]["smtp_port"])
     sender = st.secrets["email"]["sender_email"]
     password = st.secrets["email"]["sender_password"]
     recipient = st.secrets["email"]["recipient_email"]
 
+    recipients = [recipient]
+    if tech_copy_email and tech_copy_email.strip() and tech_copy_email.strip().lower() != recipient.lower():
+        recipients.append(tech_copy_email.strip())
+
     msg = EmailMessage()
     msg["Subject"] = f"Backwoods Services Log Ready — {billing_month} (Inv #{invoice_num} | ${total_amount:,.2f})"
     msg["From"] = sender
-    msg["To"] = recipient
+    msg["To"] = ", ".join(recipients)
     msg.set_content(
-        f"Hi Drew,\n\n"
+        f"Hi Team,\n\n"
         f"Backwoods Services has completed the monthly visit log for {billing_month}.\n\n"
         f"- Invoice #: {invoice_num}\n"
         f"- Total Verified Visits: {total_visits}\n"
         f"- Total Invoice Amount: ${total_amount:,.2f}\n\n"
-        f"The clean PDF visit log is attached to this email for your records and photo audit.\n"
+        f"The clean PDF visit log is attached to this email for your records, Novo invoice attachment, and photo audit.\n"
     )
     filename = f"Backwoods_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
     msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=filename)
@@ -274,7 +285,7 @@ def send_completion_email(pdf_bytes: bytes, billing_month: str, invoice_num: str
 
 
 # --- APP HEADER ---
-st.title("🧹Monthly Log")
+st.title("🧹 Backwoods Monthly Log")
 st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
 
 now = datetime.now()
@@ -408,7 +419,7 @@ with st.expander(
 st.divider()
 
 # --- STEP 2: REVIEW & SUBMIT ---
-st.subheader("2. Download PDF & Notify Drew")
+st.subheader("2. Download PDF & Email Completed Log")
 active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
 
 if active_preview.empty:
@@ -427,9 +438,31 @@ else:
         type="secondary",
     )
 
-    if st.button("📧 2. Email Completed Log to Drew", type="primary", use_container_width=True):
+    tech_copy_email = st.text_input(
+        "Send a PDF copy to yourself (for uploading to Novo):",
+        value="backwoodservices01@gmail.com",
+        help="Leave blank if you only want to send to the Team email.",
+    )
+
+    if st.button("📧 2. Email Completed Log to Team", type="primary", use_container_width=True):
         try:
-            send_completion_email(pdf_bytes, billing_month, invoice_num, tot_visits, tot_amt)
-            st.success(f"Sent! Drew received the {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits).")
+            send_completion_email(
+                pdf_bytes,
+                billing_month,
+                invoice_num,
+                tot_visits,
+                tot_amt,
+                tech_copy_email=tech_copy_email,
+            )
+            if tech_copy_email.strip():
+                st.success(
+                    f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
+                    f"emailed to Team and {tech_copy_email.strip()}."
+                )
+            else:
+                st.success(
+                    f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
+                    f"emailed to Team."
+                )
         except Exception as e:
             st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
