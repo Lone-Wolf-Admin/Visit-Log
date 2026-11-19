@@ -297,17 +297,26 @@ st.caption("Open a store group below, tap 'Tap to pick dates', select your days,
 tech_name = st.text_input("Tech / Company Name (Optional)", value="", placeholder="Enter your name or company")
 
 now = datetime.now()
-month_names = list(calendar.month_name)[1:]
-col_m, col_y, col_i = st.columns([2, 1.3, 1.3])
-with col_m:
-    selected_month_name = st.selectbox("Month", month_names, index=now.month - 1)
-with col_y:
-    selected_year = st.selectbox("Year", [now.year - 1, now.year, now.year + 1], index=1)
+prev_year = now.year - 1 if now.month == 1 else now.year
+prev_month = 12 if now.month == 1 else now.month - 1
+
+period_options = [
+    (now.year, now.month, f"{calendar.month_name[now.month]} {now.year}"),
+    (prev_year, prev_month, f"{calendar.month_name[prev_month]} {prev_year}"),
+]
+
+col_p, col_i = st.columns([2.3, 1.3])
+with col_p:
+    selected_period = st.selectbox(
+        "Billing Period",
+        options=period_options,
+        format_func=lambda x: x[2],
+        index=0,
+    )
 with col_i:
     invoice_num = st.text_input("Invoice #", value="0026")
 
-selected_month_num = month_names.index(selected_month_name) + 1
-billing_month = f"{selected_month_name} {selected_year}"
+selected_year, selected_month_num, billing_month = selected_period
 
 # --- LIVE SUMMARY BANNER ---
 summary_df = build_summary_df()
