@@ -1,7 +1,7 @@
 import calendar
 import re
 import smtplib
-from datetime import datetime
+from datetime import date, datetime
 from email.message import EmailMessage
 import pandas as pd
 import streamlit as st
@@ -364,6 +364,55 @@ def send_completion_email(
         server.send_message(msg)
 
 
+def send_insurance_email(
+    pdf_bytes: bytes,
+    pdf_filename: str,
+    tech_name: str,
+    company_name: str,
+    policy_type: str,
+    carrier_name: str,
+    policy_number: str,
+    expiration_date: str,
+    coverage_limit: str,
+    notes: str = "",
+    tech_copy_email: str = "",
+):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    recipients = [recipient]
+    if tech_copy_email and tech_copy_email.strip() and tech_copy_email.strip().lower() != recipient.lower():
+        recipients.append(tech_copy_email.strip())
+
+    entity_label = company_name.strip() if company_name.strip() else tech_name.strip()
+
+    msg = EmailMessage()
+    msg["Subject"] = f"Insurance Policy / COI Uploaded — {entity_label} ({policy_type} | Exp: {expiration_date})"
+    msg["From"] = sender
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(
+        f"Hi Team,\n\n"
+        f"A new Insurance Policy / Certificate of Insurance (COI) has been submitted via the Lone Wolf Field Portal.\n\n"
+        f"- Tech / Contact Name: {tech_name.strip()}\n"
+        f"- Business / LLC Name: {company_name.strip() or 'N/A'}\n"
+        f"- Policy Type: {policy_type}\n"
+        f"- Insurance Carrier: {carrier_name.strip()}\n"
+        f"- Policy Number: {policy_number.strip()}\n"
+        f"- Expiration Date: {expiration_date}\n"
+        f"- Coverage Limit: {coverage_limit.strip() or 'See attached PDF'}\n"
+        f"- Notes: {notes.strip() or 'None'}\n\n"
+        f"The uploaded PDF policy document ({pdf_filename}) is attached to this email.\n"
+    )
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=pdf_filename)
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
 def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> list[dict]:
     """Orders selected stops starting from Home Base (Lakewood) using nearest-neighbor routing."""
     remaining = stops.copy()
@@ -415,7 +464,14 @@ def render_home_page():
         st.write("Complete your pre-trip / post-trip vehicle & sweeper inspection and log it directly to the team sheet.")
         st.link_button("Open Vehicle Checklist →", VEHICLE_CHECKLIST_URL, type="primary", use_container_width=True)
 
-    # Card 4: Placeholder for Upcoming Pages
+    # Card 4: Insurance Policy & COI Upload
+    with st.container(border=True):
+        st.subheader("🛡️ Insurance Policy & COI Upload")
+        st.write("Submit your policy details, drop a copy of your insurance PDF, and email it directly to the team.")
+        if st.button("Upload Insurance Policy →", type="primary", use_container_width=True):
+            navigate_to("insurance_upload")
+
+    # Card 5: Placeholder for Upcoming Pages
     with st.container(border=True):
         st.subheader("🧰 More Tools Coming Soon")
         st.caption("DMG Pro Cross-Reference Audit and Snow / L&L Logs will live right here.")
@@ -763,6 +819,108 @@ def render_route_optimizer_page():
 
 
 # ==============================================================================
+# PAGE 4: INSURANCE POLICY & COI UPLOAD
+# ==============================================================================
+def render_insurance_upload_page():
+    if st.button("← Back to Home", key="top_back_ins"):
+        navigate_to("home")
+
+    st.title("🛡️ Insurance Policy & COI Upload")
+    st.caption("Fill out your policy details below, drop your PDF Certificate of Insurance, and email it to the team.")
+
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            tech_name = st.text_input("Tech / Contact Name *", placeholder="e.g., John Smith")
+        with col2:
+            company_name = st.text_input("Business / LLC Name", placeholder="e.g., Smith Sweeping LLC")
+
+        col3, col4 = st.columns(2)
+        with col3:
+            policy_type = st.selectbox(
+                "Policy Type *",
+                options=[
+                    "General Liability (GL)",
+                    "Commercial Auto",
+                    "Workers' Compensation",
+                    "Combined COI / Umbrella",
+                    "Other",
+                ],
+            )
+        with col4:
+            carrier_name = st.text_input("Insurance Carrier *", placeholder="e.g., Progressive / Hiscox")
+
+        col5, col6 = st.columns(2)
+        with col5:
+            policy_number = st.text_input("Policy Number *", placeholder="e.g., GL-12345678")
+        with col6:
+            exp_date = st.date_input("Policy Expiration Date *", value=date.today())
+
+        coverage_limit = st.text_input(
+            "Coverage Limit (Optional)",
+            placeholder="e.g., $1,000,000 / $2,000,000 Aggregate",
+        )
+        notes = st.text_area(
+            "Additional Notes (Optional)",
+            placeholder="Any notes about additional insured status, renewal updates, etc.",
+            height=80,
+        )
+
+        st.markdown("**📎 Drop or Upload Insurance Policy PDF ***")
+        uploaded_pdf = st.file_uploader(
+            "Drop your PDF file here",
+            type=["pdf"],
+            accept_multiple_files=False,
+            label_visibility="collapsed",
+        )
+
+        if uploaded_pdf is not None:
+            size_kb = round(len(uploaded_pdf.getvalue()) / 1024, 1)
+            st.info(f"Ready to attach: **{uploaded_pdf.name}** ({size_kb} KB)")
+
+        tech_copy_email = st.text_input(
+            "Send a confirmation copy to yourself (Optional)",
+            placeholder="your.email@gmail.com",
+        )
+
+        if st.button("📧 Email Insurance Policy to Team", type="primary", use_container_width=True):
+            if not tech_name.strip() or not carrier_name.strip() or not policy_number.strip():
+                st.warning("Please fill in your Name, Insurance Carrier, and Policy Number.")
+            elif uploaded_pdf is None:
+                st.warning("Please drop or upload a PDF copy of your insurance policy / COI before sending.")
+            else:
+                try:
+                    send_insurance_email(
+                        pdf_bytes=uploaded_pdf.getvalue(),
+                        pdf_filename=uploaded_pdf.name,
+                        tech_name=tech_name,
+                        company_name=company_name,
+                        policy_type=policy_type,
+                        carrier_name=carrier_name,
+                        policy_number=policy_number,
+                        expiration_date=exp_date.strftime("%Y-%m-%d"),
+                        coverage_limit=coverage_limit,
+                        notes=notes,
+                        tech_copy_email=tech_copy_email,
+                    )
+                    if tech_copy_email.strip():
+                        st.success(
+                            f"Sent! **{policy_type}** policy (`{uploaded_pdf.name}`) has been emailed to the team "
+                            f"and copied to **{tech_copy_email.strip()}**."
+                        )
+                    else:
+                        st.success(
+                            f"Sent! **{policy_type}** policy (`{uploaded_pdf.name}`) has been emailed to the team."
+                        )
+                except Exception as e:
+                    st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
+
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_ins", use_container_width=True):
+        navigate_to("home")
+
+
+# ==============================================================================
 # ROUTER
 # ==============================================================================
 if st.session_state.current_page == "home":
@@ -771,3 +929,5 @@ elif st.session_state.current_page == "visit_log":
     render_visit_log_page()
 elif st.session_state.current_page == "route_optimizer":
     render_route_optimizer_page()
+elif st.session_state.current_page == "insurance_upload":
+    render_insurance_upload_page()
