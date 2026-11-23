@@ -3,18 +3,19 @@ import re
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
+from urllib.parse import quote
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
 
 st.set_page_config(
-    page_title="Monthly Visit Log",
-    page_icon="🧹",
+    page_title="Lone Wolf Field Portal",
+    page_icon="🐺",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# Mobile-first CSS: keeps the 7-column calendar grid on 1 row on Android screens and styles green selected dates
+# Mobile-first CSS: keeps the 7-column calendar grid on 1 row on Android screens and styles cards/buttons
 st.markdown(
     """
     <style>
@@ -107,7 +108,50 @@ RATE_CARD = [
     {"id": "wg_kip_swp", "account": "Walgreens", "location": "Kipling", "service": "Sweeping", "rate": 25.00, "addr_keys": ["5870 s kipling"]},
 ]
 
-# Always ensure every RATE_CARD id exists in session_state.visits
+# Denver Route Stops from Addresses for routing.xlsx (with approximate lat/lon for nearest-neighbor route sorting)
+HOME_BASE = {
+    "name": "Home Base (Lakewood)",
+    "address": "2345 Allison St, Lakewood, CO 80214",
+    "lat": 39.7517,
+    "lon": -105.0861,
+}
+
+ROUTE_STOPS = [
+    {"id": "r_hr_saf", "store": "Highlands Ranch Safeway", "address": "9255 S Broadway, Highlands Ranch, CO 80129", "line": "Dual", "flex": "NO", "days": ["Mon", "Wed", "Fri"], "lat": 39.5481, "lon": -104.9877},
+    {"id": "r_ks_ham", "store": "King Soopers - Hampden", "address": "6470 E Hampden Ave, Denver, CO 80222", "line": "Dual", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6534, "lon": -104.9126},
+    {"id": "r_ks_eva", "store": "King Soopers - Evans", "address": "2727 W Evans Ave, Denver, CO 80219", "line": "Sweep", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6787, "lon": -105.0216},
+    {"id": "r_ks_sho", "store": "King Soopers - S Holly", "address": "6000 S Holly St, Greenwood Village, CO 80111", "line": "Dual", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6075, "lon": -104.9225},
+    {"id": "r_ks_fed", "store": "King Soopers - Federal", "address": "5050 S Federal Blvd, Englewood, CO 80110", "line": "Sweep", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6248, "lon": -105.0253},
+    {"id": "r_ks_lee", "store": "King Soopers - Leetsdale", "address": "4600 Leetsdale Dr, Glendale, CO 80246", "line": "Sweep", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], "lat": 39.7011, "lon": -104.9336},
+    {"id": "r_ks_ark", "store": "King Soopers - Arkansas (2x/wk)", "address": "4201 E Arkansas Ave, Denver, CO 80222", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.6908, "lon": -104.9383},
+    {"id": "r_ks_qui", "store": "King Soopers - Quincy (1x/wk)", "address": "19001 E Quincy Ave, Aurora, CO 80015", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.6384, "lon": -104.7663},
+    {"id": "r_ks_lit", "store": "King Soopers - Littleton", "address": "100 W Littleton Blvd, Littleton, CO 80120", "line": "Dual", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6135, "lon": -105.0177},
+    {"id": "r_bb_mex", "store": "Best Buy - Mexico", "address": "4100 E Mexico Ave Ste A, Denver, CO 80222", "line": "Sweep", "flex": "NO", "days": ["Tue", "Thu"], "lat": 39.6836, "lon": -104.9398},
+    {"id": "r_bb_wad", "store": "Best Buy - Wadsworth", "address": "5395 S Wadsworth Blvd, Littleton, CO 80123", "line": "Sweep", "flex": "NO", "days": ["Tue", "Thu"], "lat": 39.6186, "lon": -105.0815},
+    {"id": "r_ko_que", "store": "Kohl's 2 - Quebec (2x/wk)", "address": "8660 S Quebec St, Lone Tree, CO 80124", "line": "Dual", "flex": "Yes", "days": [], "lat": 39.5594, "lon": -104.9036},
+    {"id": "r_ko_kip", "store": "Kohl's 3 - Kipling (2x/wk)", "address": "8444 S Kipling Pkwy, Littleton, CO 80127", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.5638, "lon": -105.1101},
+    {"id": "r_ko_cas", "store": "Kohl's 4 - Castle Rock (2x/wk)", "address": "4800 Milestone Ln, Castle Rock, CO 80104", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.4106, "lon": -104.8814},
+    {"id": "r_ko_20m", "store": "Kohl's 5 - 20 Mile (2x/wk)", "address": "11485 S Twenty Mile Rd, Parker, CO 80134", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.5082, "lon": -104.7654},
+    {"id": "r_sc_wad", "store": "Sam's Club - Wadsworth (2x/wk)", "address": "4827 S Wadsworth Way, Littleton, CO 80123", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.6285, "lon": -105.0814},
+    {"id": "r_wg_ara", "store": "Walgreens - Arapahoe (1x/wk)", "address": "16440 E Arapahoe Rd, Foxfield, CO 80016", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.5955, "lon": -104.7963},
+    {"id": "r_wg_kip", "store": "Walgreens - Kipling (1x/wk)", "address": "5870 S Kipling Pkwy, Littleton, CO 80127", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.6104, "lon": -105.1099},
+    {"id": "r_wg_hgr", "store": "Walgreens - Highlands Ranch (2x/wk)", "address": "9390 S Colorado Blvd, Highlands Ranch, CO 80126", "line": "Dual", "flex": "Yes", "days": [], "lat": 39.5461, "lon": -104.9432},
+    {"id": "r_wg_bel", "store": "Walgreens - Belleview (1x/wk)", "address": "2697 W Belleview Ave, Littleton, CO 80123", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.6238, "lon": -105.0209},
+    {"id": "r_lo_pea", "store": "Lowe's - Peakview (Mon + 1 Flex)", "address": "9100 E Peakview Ave, Greenwood Village, CO 80111", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5979, "lon": -104.8825},
+    {"id": "r_lo_san", "store": "Lowe's - Santa Fe (Mon + 1 Flex)", "address": "5095 S Santa Fe Dr, Littleton, CO 80120", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.6244, "lon": -105.0232},
+    {"id": "r_lo_buc", "store": "Lowe's - Buckley (Mon + 1 Flex)", "address": "4455 S Buckley Rd, Aurora, CO 80015", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.6355, "lon": -104.7915},
+    {"id": "r_lo_20m", "store": "Lowe's - 20 Mile (Mon + 1 Flex)", "address": "10000 S Twenty Mile Rd, Parker, CO 80134", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5342, "lon": -104.7652},
+    {"id": "r_lo_whe", "store": "Lowe's - Wheatlands (Mon + 1 Flex)", "address": "24505 E Wheatlands Pkwy, Aurora, CO 80016", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5919, "lon": -104.7024},
+]
+
+# --- SESSION STATE INITIALIZATION ---
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "home"
+if "confirm_leave_log" not in st.session_state:
+    st.session_state.confirm_leave_log = False
+if "log_submitted" not in st.session_state:
+    st.session_state.log_submitted = False
+
 if "visits" not in st.session_state or not isinstance(st.session_state.visits, dict):
     st.session_state.visits = {}
 for row in RATE_CARD:
@@ -121,6 +165,23 @@ if "extra_items" not in st.session_state:
     st.session_state.extra_items = []
 if "extra_temp_days" not in st.session_state:
     st.session_state.extra_temp_days = []
+
+
+def navigate_to(page_name: str):
+    st.session_state.current_page = page_name
+    st.session_state.confirm_leave_log = False
+    st.rerun()
+
+
+def reset_visit_log_data():
+    for row in RATE_CARD:
+        st.session_state.visits[row["id"]] = []
+    st.session_state.extra_items = []
+    st.session_state.extra_temp_days = []
+    st.session_state.open_account = None
+    st.session_state.open_calendar = None
+    st.session_state.log_submitted = False
+    st.session_state.confirm_leave_log = False
 
 
 def render_calendar_picker(selected_days: list[int], year: int, month_num: int, key_prefix: str) -> list[int]:
@@ -296,368 +357,407 @@ def send_completion_email(
         server.send_message(msg)
 
 
-def match_store_from_text(text_block: str) -> str:
-    """Matches a DMG Pro address or store name snippet to our canonical Store label."""
-    low = text_block.lower()
-    for item in RATE_CARD:
-        for key in item["addr_keys"]:
-            if key in low:
-                return f"{item['account']} - {item['location']}"
-    return "Unmapped / Out-of-Route Store"
+def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> list[dict]:
+    """Orders selected stops starting from Home Base (Lakewood) using nearest-neighbor routing."""
+    remaining = stops.copy()
+    ordered = []
+    curr_lat, curr_lon = HOME_BASE["lat"], HOME_BASE["lon"]
 
-
-def parse_dmg_pasted_text(raw_text: str) -> pd.DataFrame:
-    """Parses copied screen text from either DMG Pro Invoices cards or Job Details pages."""
-    records = []
-    if not raw_text or not raw_text.strip():
-        return pd.DataFrame()
-
-    # Check if this is a Job Details page ("Job details / JOB-...")
-    job_detail_match = re.search(r"Job details\s*/\s*(JOB-[A-Z0-9-]+)", raw_text)
-    if job_detail_match:
-        job_id = job_detail_match.group(1)
-        store_label = match_store_from_text(raw_text)
-        elig_match = re.search(r"Eligible visits\s+(\d+)", raw_text)
-        elig_visits = int(elig_match.group(1)) if elig_match else 0
-
-        # Extract Visit check-ins (e.g., "Visit 1 Check-in: Nov 10, 2026 9:38 PM")
-        visit_matches = re.findall(
-            r"Visit\s+\d+.*?Check-in:\s*([A-Za-z]+\s+\d{1,2},\s+\d{4})",
-            raw_text,
-            flags=re.DOTALL,
+    while remaining:
+        nearest = min(
+            remaining,
+            key=lambda s: (s["lat"] - curr_lat) ** 2 + (s["lon"] - curr_lon) ** 2,
         )
-        day_nums = []
-        for dt_str in visit_matches:
-            try:
-                day_nums.append(datetime.strptime(dt_str, "%b %d, %Y").day)
-            except ValueError:
-                pass
+        ordered.append(nearest)
+        curr_lat, curr_lon = nearest["lat"], nearest["lon"]
+        remaining.remove(nearest)
 
-        # Extract dollar totals on the job detail page
-        amounts = [float(a.replace(",", "")) for a in re.findall(r"Total\s*\n?\s*\$([\d,]+\.\d{2})", raw_text)]
-        total_amt = sum(amounts)
-
-        records.append(
-            {
-                "Store": store_label,
-                "Job Number": job_id,
-                "DMG Eligible Visits": elig_visits if elig_visits > 0 else len(day_nums),
-                "DMG Check-In Days": ", ".join(str(d) for d in sorted(set(day_nums))),
-                "DMG Amount": round(total_amt, 2),
-            }
-        )
-        return pd.DataFrame(records)
-
-    # Otherwise parse Invoices & Payments card list (split by "Invoice number")
-    chunks = re.split(r"(?=Invoice number\s+I\d+-)", raw_text)
-    for chunk in chunks:
-        job_m = re.search(r"Job number\s+(JOB-[A-Z0-9-]+)", chunk)
-        amt_m = re.search(r"Amount\s+\$([\d,]+\.\d{2})", chunk)
-        if job_m and amt_m:
-            store_label = match_store_from_text(chunk)
-            records.append(
-                {
-                    "Store": store_label,
-                    "Job Number": job_m.group(1),
-                    "DMG Eligible Visits": None,
-                    "DMG Check-In Days": "(Open job in DMG to view days)",
-                    "DMG Amount": float(amt_m.group(1).replace(",", "")),
-                }
-            )
-    return pd.DataFrame(records)
+    return ordered
 
 
-# --- APP HEADER ---
-st.title("🧹 Monthly Visit Log")
-st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
-
-tech_name = st.text_input("Tech / Company Name (Optional)", value="", placeholder="Enter your name or company")
-
-now = datetime.now()
-prev_year = now.year - 1 if now.month == 1 else now.year
-prev_month = 12 if now.month == 1 else now.month - 1
-
-period_options = [
-    (now.year, now.month, f"{calendar.month_name[now.month]} {now.year}"),
-    (prev_year, prev_month, f"{calendar.month_name[prev_month]} {prev_year}"),
-]
-
-col_p, col_i = st.columns([2.3, 1.3])
-with col_p:
-    selected_period = st.selectbox(
-        "Billing Period",
-        options=period_options,
-        format_func=lambda x: x[2],
-        index=0,
-    )
-with col_i:
-    invoice_num = st.text_input("Invoice #", value="0026")
-
-selected_year, selected_month_num, billing_month = selected_period
-
-# --- LIVE SUMMARY BANNER ---
-summary_df = build_summary_df()
-tot_visits = int(summary_df["Visits"].sum())
-tot_amt = float(summary_df["Amount"].sum())
-
-k1, k2 = st.columns(2)
-k1.metric("Total Visits Logged", f"{tot_visits}")
-k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
-
-st.divider()
-
-# --- STEP 1: TAP DATES VISITED BY ACCOUNT ---
-st.subheader("1. Select Dates Visited")
-accounts = [
-    "King Soopers",
-    "Lowe's",
-    "Kohl's",
-    "Best Buy",
-    "Highlands Ranch / Safeway",
-    "Sam's Club",
-    "Walgreens",
-]
-
-for acct in accounts:
-    acct_items = [x for x in RATE_CARD if x["account"] == acct]
-    acct_visits = sum(len(st.session_state.visits.get(x["id"], [])) for x in acct_items)
-    acct_dollars = sum(len(st.session_state.visits.get(x["id"], [])) * x["rate"] for x in acct_items)
-    badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
-
-    is_acct_open = (st.session_state.open_account == acct) or any(
-        st.session_state.open_calendar == x["id"] for x in acct_items
-    )
-
-    with st.expander(f"{acct}{badge}", expanded=is_acct_open):
-        for item in acct_items:
-            current_days = st.session_state.visits.get(item["id"], [])
-            is_cal_open = st.session_state.open_calendar == item["id"]
-
-            if current_days:
-                days_preview = ", ".join(str(d) for d in current_days)
-                st.markdown(
-                    f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)  \n"
-                    f"Selected ({len(current_days)}): `{days_preview}`"
-                )
-            else:
-                st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
-
-            if not is_cal_open:
-                if st.button("📅 Tap to pick dates", key=f"open_{item['id']}", use_container_width=True):
-                    st.session_state.open_account = acct
-                    st.session_state.open_calendar = item["id"]
-                    st.rerun()
-            else:
-                with st.container(border=True):
-                    new_days = render_calendar_picker(
-                        selected_days=current_days,
-                        year=selected_year,
-                        month_num=selected_month_num,
-                        key_prefix=item["id"],
-                    )
-                    if new_days != current_days:
-                        st.session_state.visits[item["id"]] = new_days
-                        st.rerun()
-
-                    if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
-                        st.session_state.open_account = acct
-                        st.session_state.open_calendar = None
-                        st.rerun()
-
-            st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
-
-        if st.button(f"Done with {acct} ▲", key=f"done_{acct}", use_container_width=True):
-            st.session_state.open_account = None
-            st.session_state.open_calendar = None
-            st.rerun()
-
-# Optional One-Off / Bulk Trash section
-with st.expander(
-    "➕ Add One-Off Job (e.g., Bulk Trash)",
-    expanded=(st.session_state.open_account == "extra_job" or st.session_state.open_calendar == "extra_job"),
-):
-    ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
-    ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
-
-    if st.session_state.extra_temp_days:
-        st.caption(f"Selected days: {', '.join(str(d) for d in st.session_state.extra_temp_days)}")
-
-    if st.session_state.open_calendar != "extra_job":
-        if st.button("📅 Tap to pick dates", key="open_extra_job", use_container_width=True):
-            st.session_state.open_account = "extra_job"
-            st.session_state.open_calendar = "extra_job"
-            st.rerun()
+def build_google_maps_url(ordered_stops: list[dict], round_trip: bool = True) -> str:
+    origin = quote(HOME_BASE["address"])
+    if round_trip:
+        destination = origin
+        waypoints = "|".join(quote(s["address"]) for s in ordered_stops)
     else:
-        with st.container(border=True):
-            new_ex_days = render_calendar_picker(
-                selected_days=st.session_state.extra_temp_days,
-                year=selected_year,
-                month_num=selected_month_num,
-                key_prefix="extra_job",
-            )
-            if new_ex_days != st.session_state.extra_temp_days:
-                st.session_state.extra_temp_days = new_ex_days
-                st.rerun()
+        destination = quote(ordered_stops[-1]["address"])
+        waypoints = "|".join(quote(s["address"]) for s in ordered_stops[:-1])
 
-            if st.button("✅ OK", key="ok_extra_job", type="primary", use_container_width=True):
+    url = f"https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}&travelmode=driving"
+    if waypoints:
+        url += f"&waypoints={waypoints}"
+    return url
+
+
+# ==============================================================================
+# PAGE 1: LANDING / HUB PAGE
+# ==============================================================================
+def render_home_page():
+    st.title("🐺 Lone Wolf Field Portal")
+    st.caption("Select a tool below to get started.")
+
+    summary_df = build_summary_df()
+    active_visits = int(summary_df["Visits"].sum())
+    active_amt = float(summary_df["Amount"].sum())
+
+    # Card 1: Monthly Visit Log
+    with st.container(border=True):
+        st.subheader("🧹 Monthly Visit Log")
+        st.write("Log store visits by calendar date, export your Novo-ready PDF, and email your completed report.")
+        if active_visits > 0 and not st.session_state.log_submitted:
+            st.warning(f"In-progress draft: **{active_visits} visits (${active_amt:,.2f})** not yet submitted.")
+        if st.button("Open Monthly Visit Log →", type="primary", use_container_width=True):
+            navigate_to("visit_log")
+
+    # Card 2: Route Optimizer
+    with st.container(border=True):
+        st.subheader("🗺️ Denver Route Optimizer")
+        st.write("Build your daily sweep & porter route from Lakewood HQ, add flexible stops, and launch Google Maps.")
+        if st.button("Open Route Optimizer →", type="primary", use_container_width=True):
+            navigate_to("route_optimizer")
+
+    # Card 3: Placeholder for Upcoming Pages
+    with st.container(border=True):
+        st.subheader("🧰 More Tools Coming Soon")
+        st.caption("DMG Pro Cross-Reference Audit, Snow / L&L Logs, and Equipment Checklists will live right here.")
+
+
+# ==============================================================================
+# PAGE 2: MONTHLY VISIT LOG (WITH UNSAVED DATA PROTECTION)
+# ==============================================================================
+def render_visit_log_page():
+    summary_df = build_summary_df()
+    tot_visits = int(summary_df["Visits"].sum())
+    tot_amt = float(summary_df["Amount"].sum())
+    has_unsaved = (tot_visits > 0) and (not st.session_state.log_submitted)
+
+    # Top Navigation Bar with Back Button
+    nav_col1, nav_col2 = st.columns([1.4, 2.6])
+    with nav_col1:
+        if st.button("← Back to Home", use_container_width=True):
+            if has_unsaved:
+                st.session_state.confirm_leave_log = True
+                st.rerun()
+            else:
+                navigate_to("home")
+
+    # Unsaved Changes Warning Banner
+    if st.session_state.confirm_leave_log and has_unsaved:
+        with st.container(border=True):
+            st.error(
+                f"⚠️ **Data Will Be Lost if Not Submitted!**  \n"
+                f"You currently have **{tot_visits} visit(s) (${tot_amt:,.2f})** entered that have not been emailed yet. "
+                f"Please scroll down and tap **Email Completed Log to Team** first, or confirm below if you want to discard and return Home."
+            )
+            w_col1, w_col2 = st.columns(2)
+            with w_col1:
+                if st.button("Stay & Submit First", type="primary", use_container_width=True):
+                    st.session_state.confirm_leave_log = False
+                    st.rerun()
+            with w_col2:
+                if st.button("Discard & Go Home", type="secondary", use_container_width=True):
+                    reset_visit_log_data()
+                    navigate_to("home")
+
+    st.title("🧹 Monthly Visit Log")
+    st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
+
+    tech_name = st.text_input("Tech / Company Name (Optional)", value="", placeholder="Enter your name or company")
+
+    now = datetime.now()
+    prev_year = now.year - 1 if now.month == 1 else now.year
+    prev_month = 12 if now.month == 1 else now.month - 1
+
+    period_options = [
+        (now.year, now.month, f"{calendar.month_name[now.month]} {now.year}"),
+        (prev_year, prev_month, f"{calendar.month_name[prev_month]} {prev_year}"),
+    ]
+
+    col_p, col_i = st.columns([2.3, 1.3])
+    with col_p:
+        selected_period = st.selectbox(
+            "Billing Period",
+            options=period_options,
+            format_func=lambda x: x[2],
+            index=0,
+        )
+    with col_i:
+        invoice_num = st.text_input("Invoice #", value="0026")
+
+    selected_year, selected_month_num, billing_month = selected_period
+
+    k1, k2 = st.columns(2)
+    k1.metric("Total Visits Logged", f"{tot_visits}")
+    k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
+
+    st.divider()
+
+    # --- STEP 1: TAP DATES VISITED BY ACCOUNT ---
+    st.subheader("1. Select Dates Visited")
+    accounts = [
+        "King Soopers",
+        "Lowe's",
+        "Kohl's",
+        "Best Buy",
+        "Highlands Ranch / Safeway",
+        "Sam's Club",
+        "Walgreens",
+    ]
+
+    for acct in accounts:
+        acct_items = [x for x in RATE_CARD if x["account"] == acct]
+        acct_visits = sum(len(st.session_state.visits.get(x["id"], [])) for x in acct_items)
+        acct_dollars = sum(len(st.session_state.visits.get(x["id"], [])) * x["rate"] for x in acct_items)
+        badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
+
+        is_acct_open = (st.session_state.open_account == acct) or any(
+            st.session_state.open_calendar == x["id"] for x in acct_items
+        )
+
+        with st.expander(f"{acct}{badge}", expanded=is_acct_open):
+            for item in acct_items:
+                current_days = st.session_state.visits.get(item["id"], [])
+                is_cal_open = st.session_state.open_calendar == item["id"]
+
+                if current_days:
+                    days_preview = ", ".join(str(d) for d in current_days)
+                    st.markdown(
+                        f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)  \n"
+                        f"Selected ({len(current_days)}): `{days_preview}`"
+                    )
+                else:
+                    st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
+
+                if not is_cal_open:
+                    if st.button("📅 Tap to pick dates", key=f"open_{item['id']}", use_container_width=True):
+                        st.session_state.open_account = acct
+                        st.session_state.open_calendar = item["id"]
+                        st.rerun()
+                else:
+                    with st.container(border=True):
+                        new_days = render_calendar_picker(
+                            selected_days=current_days,
+                            year=selected_year,
+                            month_num=selected_month_num,
+                            key_prefix=item["id"],
+                        )
+                        if new_days != current_days:
+                            st.session_state.visits[item["id"]] = new_days
+                            st.session_state.log_submitted = False
+                            st.rerun()
+
+                        if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
+                            st.session_state.open_account = acct
+                            st.session_state.open_calendar = None
+                            st.rerun()
+
+                st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
+
+            if st.button(f"Done with {acct} ▲", key=f"done_{acct}", use_container_width=True):
+                st.session_state.open_account = None
                 st.session_state.open_calendar = None
                 st.rerun()
 
-    if st.button("Add One-Off Job to Log", use_container_width=True):
-        if ex_name and st.session_state.extra_temp_days:
-            st.session_state.extra_items.append(
-                {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
-            )
-            st.session_state.extra_temp_days = []
-            st.session_state.open_calendar = None
-            st.session_state.open_account = None
-            st.rerun()
-        else:
-            st.warning("Enter a job description and tap at least one date on the calendar.")
+    # Optional One-Off / Bulk Trash section
+    with st.expander(
+        "➕ Add One-Off Job (e.g., Bulk Trash)",
+        expanded=(st.session_state.open_account == "extra_job" or st.session_state.open_calendar == "extra_job"),
+    ):
+        ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
+        ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
 
-    if st.session_state.extra_items:
-        st.markdown("**Added One-Off Jobs:**")
-        for idx, extra in enumerate(st.session_state.extra_items):
-            c1, c2 = st.columns([4, 1])
-            c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s) @ ${extra['rate']:,.2f}")
-            if c2.button("🗑️", key=f"del_extra_{idx}"):
-                st.session_state.extra_items.pop(idx)
+        if st.session_state.extra_temp_days:
+            st.caption(f"Selected days: {', '.join(str(d) for d in st.session_state.extra_temp_days)}")
+
+        if st.session_state.open_calendar != "extra_job":
+            if st.button("📅 Tap to pick dates", key="open_extra_job", use_container_width=True):
+                st.session_state.open_account = "extra_job"
+                st.session_state.open_calendar = "extra_job"
                 st.rerun()
-
-st.divider()
-
-# --- STEP 2: REVIEW & SUBMIT ---
-st.subheader("2. Download PDF & Email Completed Log")
-active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
-
-if active_preview.empty:
-    st.info("No visits selected yet. Open any store group above and tap 'Tap to pick dates'.")
-else:
-    st.dataframe(active_preview, use_container_width=True, hide_index=True)
-
-    pdf_bytes = generate_invoice_pdf(summary_df, billing_month, invoice_num, tech_name=tech_name)
-    pdf_filename = f"Monthly_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
-
-    st.download_button(
-        label="📄 1. Download PDF to Attach in Novo",
-        data=pdf_bytes,
-        file_name=pdf_filename,
-        mime="application/pdf",
-        type="secondary",
-    )
-
-    tech_copy_email = st.text_input(
-        "Send a PDF copy to yourself (optional — for uploading to Novo):",
-        value="",
-        placeholder="your.email@gmail.com",
-        help="Leave blank if you only want to send to the Team email.",
-    )
-
-    if st.button("📧 2. Email Completed Log to Team", type="primary", use_container_width=True):
-        try:
-            send_completion_email(
-                pdf_bytes,
-                billing_month,
-                invoice_num,
-                tot_visits,
-                tot_amt,
-                tech_name=tech_name,
-                tech_copy_email=tech_copy_email,
-            )
-            if tech_copy_email.strip():
-                st.success(
-                    f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
-                    f"emailed to Team and {tech_copy_email.strip()}."
-                )
-            else:
-                st.success(
-                    f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
-                    f"emailed to Team."
-                )
-        except Exception as e:
-            st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
-
-st.divider()
-
-# --- STEP 3: OPTIONAL DMG PRO AUDIT CROSS-REFERENCE ---
-with st.expander("🔍 3. Cross-Reference Log Against DMG Pro (Admin Audit)"):
-    st.caption(
-        "On DMG Pro's 'Invoices & payments' screen or inside any 'Job details' page, press Ctrl+A then Ctrl+C "
-        "and paste below to verify store addresses, dates, and dollar totals against the logged visits above."
-    )
-    dmg_pasted = st.text_area(
-        "Paste copied DMG Pro page text here:",
-        height=140,
-        placeholder="Paste Ctrl+A / Ctrl+C text from DMG Pro here...",
-    )
-    dmg_csv = st.file_uploader(
-        "Or upload DMG Pro Early-Pay / Invoices CSV export (optional):",
-        type=["csv"],
-    )
-
-    if dmg_pasted.strip():
-        parsed_dmg = parse_dmg_pasted_text(dmg_pasted)
-        if parsed_dmg.empty:
-            st.warning("Could not detect any DMG Pro job numbers or invoice cards in the pasted text.")
         else:
-            st.markdown("**Extracted DMG Pro Records (Mapped to Your Routing Addresses):**")
-            st.dataframe(parsed_dmg, use_container_width=True, hide_index=True)
-
-            # Compare by Store against active technician log
-            tech_by_store = (
-                summary_df[summary_df["Visits"] > 0]
-                .groupby("Store", as_index=False)
-                .agg({"Visits": "sum", "Amount": "sum", "Dates Visited": lambda s: ", ".join(x for x in s if x)})
-            )
-            dmg_by_store = (
-                parsed_dmg.groupby("Store", as_index=False)
-                .agg(
-                    {
-                        "Job Number": lambda s: ", ".join(s),
-                        "DMG Check-In Days": lambda s: ", ".join(x for x in s if x),
-                        "DMG Amount": "sum",
-                    }
+            with st.container(border=True):
+                new_ex_days = render_calendar_picker(
+                    selected_days=st.session_state.extra_temp_days,
+                    year=selected_year,
+                    month_num=selected_month_num,
+                    key_prefix="extra_job",
                 )
+                if new_ex_days != st.session_state.extra_temp_days:
+                    st.session_state.extra_temp_days = new_ex_days
+                    st.rerun()
+
+                if st.button("✅ OK", key="ok_extra_job", type="primary", use_container_width=True):
+                    st.session_state.open_calendar = None
+                    st.rerun()
+
+        if st.button("Add One-Off Job to Log", use_container_width=True):
+            if ex_name and st.session_state.extra_temp_days:
+                st.session_state.extra_items.append(
+                    {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
+                )
+                st.session_state.extra_temp_days = []
+                st.session_state.open_calendar = None
+                st.session_state.open_account = None
+                st.session_state.log_submitted = False
+                st.rerun()
+            else:
+                st.warning("Enter a job description and tap at least one date on the calendar.")
+
+        if st.session_state.extra_items:
+            st.markdown("**Added One-Off Jobs:**")
+            for idx, extra in enumerate(st.session_state.extra_items):
+                c1, c2 = st.columns([4, 1])
+                c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s) @ ${extra['rate']:,.2f}")
+                if c2.button("🗑️", key=f"del_extra_{idx}"):
+                    st.session_state.extra_items.pop(idx)
+                    st.session_state.log_submitted = False
+                    st.rerun()
+
+    st.divider()
+
+    # --- STEP 2: REVIEW & SUBMIT ---
+    st.subheader("2. Download PDF & Email Completed Log")
+    active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
+
+    if active_preview.empty:
+        st.info("No visits selected yet. Open any store group above and tap 'Tap to pick dates'.")
+    else:
+        st.dataframe(active_preview, use_container_width=True, hide_index=True)
+
+        pdf_bytes = generate_invoice_pdf(summary_df, billing_month, invoice_num, tech_name=tech_name)
+        pdf_filename = f"Monthly_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+
+        st.download_button(
+            label="📄 1. Download PDF to Attach in Novo",
+            data=pdf_bytes,
+            file_name=pdf_filename,
+            mime="application/pdf",
+            type="secondary",
+        )
+
+        tech_copy_email = st.text_input(
+            "Send a PDF copy to yourself (optional — for uploading to Novo):",
+            value="",
+            placeholder="your.email@gmail.com",
+            help="Leave blank if you only want to send to the Team email.",
+        )
+
+        if st.button("📧 2. Email Completed Log to Team", type="primary", use_container_width=True):
+            try:
+                send_completion_email(
+                    pdf_bytes,
+                    billing_month,
+                    invoice_num,
+                    tot_visits,
+                    tot_amt,
+                    tech_name=tech_name,
+                    tech_copy_email=tech_copy_email,
+                )
+                st.session_state.log_submitted = True
+                st.session_state.confirm_leave_log = False
+                if tech_copy_email.strip():
+                    st.success(
+                        f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
+                        f"emailed to Team and {tech_copy_email.strip()}. You can now safely return Home."
+                    )
+                else:
+                    st.success(
+                        f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
+                        f"emailed to Team. You can now safely return Home."
+                    )
+            except Exception as e:
+                st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
+
+
+# ==============================================================================
+# PAGE 3: DENVER ROUTE OPTIMIZER
+# ==============================================================================
+def render_route_optimizer_page():
+    if st.button("← Back to Home"):
+        navigate_to("home")
+
+    st.title("🗺️ Denver Route Optimizer")
+    st.caption(f"Starts & ends at **{HOME_BASE['address']}**")
+
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    today_short = day_names[datetime.now().weekday()]
+
+    col_d, col_rt = st.columns([2, 1.5])
+    with col_d:
+        selected_day = st.selectbox("Route Day", options=day_names, index=day_names.index(today_short))
+    with col_rt:
+        st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
+        round_trip = st.checkbox("Return to Lakewood", value=True)
+
+    # Split stops into Mandatory for selected day vs. Flexible / Other stops
+    scheduled_stops = [s for s in ROUTE_STOPS if selected_day in s["days"]]
+    flex_stops = [s for s in ROUTE_STOPS if selected_day not in s["days"]]
+
+    st.subheader(f"1. Scheduled Stops for {selected_day} ({len(scheduled_stops)})")
+    selected_stop_ids = []
+    if scheduled_stops:
+        for s in scheduled_stops:
+            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=True, key=f"sch_{s['id']}"):
+                selected_stop_ids.append(s["id"])
+    else:
+        st.info(f"Only King Soopers Leetsdale is fixed on {selected_day}s. Add flexible stops below.")
+
+    with st.expander(f"➕ Add Flexible / Extra Stops ({len(flex_stops)} available)", expanded=(selected_day in ["Wed", "Thu", "Fri", "Sat"])):
+        for s in flex_stops:
+            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=False, key=f"flx_{s['id']}"):
+                selected_stop_ids.append(s["id"])
+
+    chosen_stops = [s for s in ROUTE_STOPS if s["id"] in selected_stop_ids]
+
+    st.divider()
+    st.subheader(f"2. Optimized Stop Sequence ({len(chosen_stops)} stops)")
+
+    if not chosen_stops:
+        st.warning("Select at least one stop above to build your route.")
+    else:
+        ordered = order_stops_nearest_neighbor(chosen_stops, round_trip=round_trip)
+
+        route_rows = [{"Stop #": "Start", "Location": HOME_BASE["name"], "Service": "-", "Address": HOME_BASE["address"]}]
+        for idx, s in enumerate(ordered, start=1):
+            route_rows.append(
+                {
+                    "Stop #": f"#{idx}",
+                    "Location": s["store"],
+                    "Service": s["line"],
+                    "Address": s["address"],
+                }
             )
-            audit_df = pd.merge(tech_by_store, dmg_by_store, on="Store", how="outer").fillna(
-                {"Visits": 0, "Amount": 0.0, "Dates Visited": "-", "Job Number": "-", "DMG Check-In Days": "-", "DMG Amount": 0.0}
-            )
-            audit_df["Tech Visits"] = audit_df["Visits"].astype(int)
-            audit_df["Tech Billed ($)"] = audit_df["Amount"].round(2)
-            audit_df["DMG Portal ($)"] = audit_df["DMG Amount"].round(2)
+        if round_trip:
+            route_rows.append({"Stop #": "End", "Location": HOME_BASE["name"], "Service": "-", "Address": HOME_BASE["address"]})
 
-            def audit_status(row):
-                if row["Store"] == "Unmapped / Out-of-Route Store":
-                    return "⚠️ Out-of-Route Store"
-                if row["Tech Visits"] > 0 and row["DMG Portal ($)"] == 0:
-                    return "❌ Missing in DMG Paste"
-                if row["Tech Visits"] == 0 and row["DMG Portal ($)"] > 0:
-                    return "📋 In DMG, Not in Log"
-                return "✅ Found in Both"
+        st.dataframe(pd.DataFrame(route_rows), use_container_width=True, hide_index=True)
 
-            audit_df["Status"] = audit_df.apply(audit_status, axis=1)
-            st.markdown("**Side-by-Side Reconciliation:**")
-            st.dataframe(
-                audit_df[
-                    [
-                        "Store",
-                        "Status",
-                        "Tech Visits",
-                        "Dates Visited",
-                        "DMG Check-In Days",
-                        "Tech Billed ($)",
-                        "DMG Portal ($)",
-                        "Job Number",
-                    ]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
+        # Google Maps supports up to 9-10 waypoints per link; split cleanly if route has >9 stops
+        if len(ordered) <= 9:
+            gmaps_url = build_google_maps_url(ordered, round_trip=round_trip)
+            st.link_button("🚀 Open Full Route in Google Maps", gmaps_url, type="primary", use_container_width=True)
+        else:
+            st.info(f"Your route has {len(ordered)} stops. Google Maps allows up to 9 stops per link, so it is split into Leg 1 & Leg 2:")
+            leg1_url = build_google_maps_url(ordered[:9], round_trip=False)
+            leg2_origin = quote(ordered[8]["address"])
+            leg2_dest = quote(HOME_BASE["address"]) if round_trip else quote(ordered[-1]["address"])
+            leg2_wp_list = ordered[9:] if round_trip else ordered[9:-1]
+            leg2_url = f"https://www.google.com/maps/dir/?api=1&origin={leg2_origin}&destination={leg2_dest}&travelmode=driving"
+            if leg2_wp_list:
+                leg2_url += "&waypoints=" + "|".join(quote(s["address"]) for s in leg2_wp_list)
 
-    if dmg_csv is not None:
-        csv_df = pd.read_csv(dmg_csv)
-        st.markdown(f"**Uploaded DMG CSV ({len(csv_df)} jobs | Total: ${csv_df['Amount'].sum():,.2f}):**")
-        st.dataframe(csv_df, use_container_width=True, hide_index=True)
+            c_leg1, c_leg2 = st.columns(2)
+            c_leg1.link_button("🚀 Leg 1 (Stops 1–9)", leg1_url, type="primary", use_container_width=True)
+            c_leg2.link_button(f"🚀 Leg 2 (Stops 10–{len(ordered)})", leg2_url, type="primary", use_container_width=True)
 
-    if not dmg_pasted.strip() and dmg_csv is None:
-        st.info("Paste copied DMG Pro screen text or upload the DMG Pro CSV above to run the cross-reference.")
+
+# ==============================================================================
+# ROUTER
+# ==============================================================================
+if st.session_state.current_page == "home":
+    render_home_page()
+elif st.session_state.current_page == "visit_log":
+    render_visit_log_page()
+elif st.session_state.current_page == "route_optimizer":
+    render_route_optimizer_page()
