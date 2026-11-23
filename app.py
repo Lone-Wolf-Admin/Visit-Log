@@ -3,7 +3,6 @@ import re
 import smtplib
 from datetime import datetime
 from email.message import EmailMessage
-from urllib.parse import quote
 import pandas as pd
 import streamlit as st
 from fpdf import FPDF
@@ -375,21 +374,6 @@ def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> 
     return ordered
 
 
-def build_google_maps_url(ordered_stops: list[dict], round_trip: bool = True) -> str:
-    origin = quote(HOME_BASE["address"])
-    if round_trip:
-        destination = origin
-        waypoints = "|".join(quote(s["address"]) for s in ordered_stops)
-    else:
-        destination = quote(ordered_stops[-1]["address"])
-        waypoints = "|".join(quote(s["address"]) for s in ordered_stops[:-1])
-
-    url = f"https://www.google.com/maps/dir/?api=1&origin={origin}&destination={destination}&travelmode=driving"
-    if waypoints:
-        url += f"&waypoints={waypoints}"
-    return url
-
-
 # ==============================================================================
 # PAGE 1: LANDING / HUB PAGE
 # ==============================================================================
@@ -413,7 +397,7 @@ def render_home_page():
     # Card 2: Route Optimizer
     with st.container(border=True):
         st.subheader("🗺️ Denver Route Optimizer")
-        st.write("Build your daily sweep & porter route from Lakewood HQ, add flexible stops, and launch Google Maps.")
+        st.write("Build your daily sweep & porter route from Lakewood HQ, copy the address list, and launch RouteXL.com.")
         if st.button("Open Route Optimizer →", type="primary", use_container_width=True):
             navigate_to("route_optimizer")
 
@@ -733,23 +717,23 @@ def render_route_optimizer_page():
 
         st.dataframe(pd.DataFrame(route_rows), use_container_width=True, hide_index=True)
 
-        # Google Maps supports up to 9-10 waypoints per link; split cleanly if route has >9 stops
-        if len(ordered) <= 9:
-            gmaps_url = build_google_maps_url(ordered, round_trip=round_trip)
-            st.link_button("🚀 Open Full Route in Google Maps", gmaps_url, type="primary", use_container_width=True)
-        else:
-            st.info(f"Your route has {len(ordered)} stops. Google Maps allows up to 9 stops per link, so it is split into Leg 1 & Leg 2:")
-            leg1_url = build_google_maps_url(ordered[:9], round_trip=False)
-            leg2_origin = quote(ordered[8]["address"])
-            leg2_dest = quote(HOME_BASE["address"]) if round_trip else quote(ordered[-1]["address"])
-            leg2_wp_list = ordered[9:] if round_trip else ordered[9:-1]
-            leg2_url = f"https://www.google.com/maps/dir/?api=1&origin={leg2_origin}&destination={leg2_dest}&travelmode=driving"
-            if leg2_wp_list:
-                leg2_url += "&waypoints=" + "|".join(quote(s["address"]) for s in leg2_wp_list)
+        # Build plain newline-separated address list for RouteXL.com bulk paste
+        address_lines = [HOME_BASE["address"]] + [s["address"] for s in ordered]
+        if round_trip:
+            address_lines.append(HOME_BASE["address"])
+        address_list_text = "\n".join(address_lines)
 
-            c_leg1, c_leg2 = st.columns(2)
-            c_leg1.link_button("🚀 Leg 1 (Stops 1–9)", leg1_url, type="primary", use_container_width=True)
-            c_leg2.link_button(f"🚀 Leg 2 (Stops 10–{len(ordered)})", leg2_url, type="primary", use_container_width=True)
+        st.markdown("**📋 Copy Selected Address List (for RouteXL.com):**")
+        st.caption("Tap the copy icon in the top-right corner of the address box below, then tap **Launch RouteXL.com** and paste.")
+        st.code(address_list_text, language="text")
+
+        c_copy, c_launch = st.columns(2)
+        with c_copy:
+            if st.button("📋 Copy selected address list", use_container_width=True):
+                st.toast("Tap the copy icon in the top-right corner of the address box above, then paste into RouteXL.com!")
+                st.info(f"Address list ready ({len(ordered)} stops) — tap the copy icon in the top-right corner of the box above.")
+        with c_launch:
+            st.link_button("🚀 Launch RouteXL.com", "https://www.routexl.com", type="primary", use_container_width=True)
 
 
 # ==============================================================================
