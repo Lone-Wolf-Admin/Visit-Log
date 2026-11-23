@@ -1,4 +1,5 @@
 import calendar
+import io
 import re
 import smtplib
 from datetime import date, datetime
@@ -115,7 +116,7 @@ RATE_CARD = [
     {"id": "wg_kip_swp", "account": "Walgreens", "location": "Kipling", "service": "Sweeping", "rate": 25.00, "addr_keys": ["5870 s kipling"]},
 ]
 
-# Denver Route Stops from Addresses for routing.xlsx (with approximate lat/lon for nearest-neighbor route sorting)
+# Denver Route Stops
 HOME_BASE = {
     "name": "Home Base (Lakewood)",
     "address": "2345 Allison St, Lakewood, CO 80214",
@@ -150,6 +151,51 @@ ROUTE_STOPS = [
     {"id": "r_lo_20m", "store": "Lowe's - 20 Mile (Mon + 1 Flex)", "address": "10000 S Twenty Mile Rd, Parker, CO 80134", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5342, "lon": -104.7652},
     {"id": "r_lo_whe", "store": "Lowe's - Wheatlands (Mon + 1 Flex)", "address": "24505 E Wheatlands Pkwy, Aurora, CO 80016", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5919, "lon": -104.7024},
 ]
+
+# Site Directory Notes (Customize gate codes, water hookups, and noise curfews per store ID)
+EMERGENCY_CONTACTS = [
+    {"role": "Lone Wolf Dispatch / Operations", "contact": "Check team thread or email dispatch"},
+    {"role": "DMG Pro Support (Work Orders)", "contact": "Log check-in/out inside DMG Pro app before leaving lot"},
+    {"role": "Non-Emergency Police (Denver Metro)", "contact": "Denver: (720) 913-2000 | Aurora: (303) 627-3100 | Arapahoe/Douglas: (303) 795-4711"},
+]
+
+SITE_NOTES = {
+    "r_ks_ark": {
+        "gate": "Open lot — check rear dock & perimeter for bulk dumping",
+        "water": "Standard tank fill at HQ before departure",
+        "curfew": "Watch residential border on east side; keep blower idle down near homes",
+    },
+    "r_ks_lee": {
+        "gate": "7-day/wk high-traffic lot — sweep after midnight close",
+        "water": "Fill at HQ",
+        "curfew": "High pedestrian/late-night traffic; run amber strobes",
+    },
+    "r_lo_pea": {
+        "gate": "Pro canopy & garden center perimeter — watch for pallet stacks",
+        "water": "Fill at HQ",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri); check lumber aisle apron",
+    },
+    "r_lo_san": {
+        "gate": "Check south lumber gate & rear receiving lane",
+        "water": "Fill at HQ",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+    },
+    "r_lo_buc": {
+        "gate": "Check rear dock & garden center curb line",
+        "water": "Fill at HQ",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+    },
+    "r_lo_20m": {
+        "gate": "Check rear loading dock & contractor parking",
+        "water": "Fill at HQ",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+    },
+    "r_lo_whe": {
+        "gate": "Open perimeter — watch windblown debris along east fence",
+        "water": "Fill at HQ",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+    },
+}
 
 # --- SESSION STATE INITIALIZATION ---
 if "current_page" not in st.session_state:
@@ -322,6 +368,82 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     return bytes(pdf.output())
 
 
+def generate_hazard_pdf(
+    tech_name: str,
+    store_name: str,
+    store_address: str,
+    timestamp_str: str,
+    issues: list[str],
+    severity: str,
+    details: str,
+    photo_bytes: bytes | None = None,
+    photo_ext: str = "jpg",
+) -> bytes:
+    """Generates a timestamped Lot Hazard / Illegal Dumping PDF with optional embedded photo."""
+    pdf = FPDF(orientation="P", unit="mm", format="Letter")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    pdf.set_fill_color(153, 27, 27)
+    pdf.rect(10, 10, 196, 22, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_xy(14, 14)
+    pdf.cell(188, 7, "LONE WOLF - LOT HAZARD & ACCESS EXCEPTION REPORT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_xy(14, 22)
+    pdf.cell(188, 6, f"Reported: {timestamp_str}  |  Tech: {tech_name.strip() or 'Field Tech'}")
+
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_xy(10, 38)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(196, 7, f"Location: {store_name}")
+    pdf.ln()
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(196, 6, f"Address: {store_address}")
+    pdf.ln()
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(196, 7, f"Priority / Impact: {severity}")
+    pdf.ln(9)
+
+    pdf.set_x(10)
+    pdf.set_fill_color(241, 245, 249)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(196, 7, "Reported Issues:", border=1, fill=True)
+    pdf.ln()
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(196, 6, ", ".join(issues) if issues else "General Site Exception", border=1)
+    pdf.ln(3)
+
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(196, 7, "Field Notes / Description:", border=1, fill=True)
+    pdf.ln()
+    pdf.set_x(10)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(196, 6, details.strip() if details.strip() else "No additional notes provided.", border=1)
+
+    if photo_bytes:
+        pdf.ln(5)
+        pdf.set_x(10)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(196, 7, "Photographic Proof Attached:")
+        pdf.ln(8)
+        try:
+            img_stream = io.BytesIO(photo_bytes)
+            fmt = "PNG" if photo_ext.lower() == "png" else "JPEG"
+            pdf.image(img_stream, x=15, w=130, type=fmt)
+        except Exception:
+            pdf.set_x(10)
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.cell(196, 6, "(Photo attached separately to email)")
+
+    return bytes(pdf.output())
+
+
 def send_completion_email(
     pdf_bytes: bytes,
     billing_month: str,
@@ -413,6 +535,111 @@ def send_insurance_email(
         server.send_message(msg)
 
 
+def send_hazard_email(
+    pdf_bytes: bytes,
+    tech_name: str,
+    store_name: str,
+    store_address: str,
+    timestamp_str: str,
+    issues: list[str],
+    severity: str,
+    details: str,
+    photo_bytes: bytes | None = None,
+    photo_filename: str = "hazard_photo.jpg",
+):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    msg = EmailMessage()
+    msg["Subject"] = f"LOT HAZARD / ACCESS REPORT — {store_name} ({severity})"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content(
+        f"Hi Team,\n\n"
+        f"A Lot Hazard / Access Exception Report was submitted from the field.\n\n"
+        f"- Tech: {tech_name.strip() or 'Field Tech'}\n"
+        f"- Time: {timestamp_str}\n"
+        f"- Store: {store_name}\n"
+        f"- Address: {store_address}\n"
+        f"- Impact / Priority: {severity}\n"
+        f"- Issues: {', '.join(issues)}\n"
+        f"- Details: {details.strip() or 'None'}\n\n"
+        f"A timestamped PDF report (and original photo, if captured) is attached.\n"
+    )
+    safe_store = re.sub(r"[^A-Za-z0-9]+", "_", store_name)[:28]
+    msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=f"Hazard_Report_{safe_store}.pdf")
+
+    if photo_bytes:
+        subtype = "png" if photo_filename.lower().endswith(".png") else "jpeg"
+        msg.add_attachment(photo_bytes, maintype="image", subtype=subtype, filename=photo_filename)
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
+def send_maintenance_email(
+    tech_name: str,
+    unit_num: str,
+    log_date: str,
+    log_types: list[str],
+    odometer_hrs: str,
+    fuel_gallons: float,
+    fuel_cost: float,
+    dump_location: str,
+    dump_load: str,
+    repair_items: list[str],
+    notes: str,
+    attachment_bytes: bytes | None = None,
+    attachment_name: str = "",
+):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    summary_tag = ", ".join(log_types) if log_types else "Shift Log"
+    msg = EmailMessage()
+    msg["Subject"] = f"Fleet / Hopper / Fuel Log — {unit_num} ({summary_tag} | {log_date})"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content(
+        f"Hi Team,\n\n"
+        f"A new Fleet, Fuel & Hopper Dump Log has been submitted.\n\n"
+        f"- Tech / Driver: {tech_name.strip()}\n"
+        f"- Truck / Unit #: {unit_num.strip()}\n"
+        f"- Date: {log_date}\n"
+        f"- Odometer / Aux Hours: {odometer_hrs.strip() or 'N/A'}\n"
+        f"- Log Categories: {summary_tag}\n\n"
+        f"--- FUEL ---\n"
+        f"- Gallons: {fuel_gallons:.2f} gal\n"
+        f"- Total Cost: ${fuel_cost:,.2f}\n\n"
+        f"--- HOPPER DUMP ---\n"
+        f"- Dump Site / Facility: {dump_location.strip() or 'N/A'}\n"
+        f"- Estimated Load: {dump_load}\n\n"
+        f"--- PARTS / MAINTENANCE NEEDED ---\n"
+        f"- Flagged Items: {', '.join(repair_items) if repair_items else 'None'}\n"
+        f"- Notes / Details: {notes.strip() or 'None'}\n"
+    )
+
+    if attachment_bytes and attachment_name:
+        lower = attachment_name.lower()
+        if lower.endswith(".pdf"):
+            msg.add_attachment(attachment_bytes, maintype="application", subtype="pdf", filename=attachment_name)
+        elif lower.endswith(".png"):
+            msg.add_attachment(attachment_bytes, maintype="image", subtype="png", filename=attachment_name)
+        else:
+            msg.add_attachment(attachment_bytes, maintype="image", subtype="jpeg", filename=attachment_name)
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
 def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> list[dict]:
     """Orders selected stops starting from Home Base (Lakewood) using nearest-neighbor routing."""
     remaining = stops.copy()
@@ -471,7 +698,28 @@ def render_home_page():
         if st.button("Upload Insurance Policy →", type="primary", use_container_width=True):
             navigate_to("insurance_upload")
 
-    # Card 5: Placeholder for Upcoming Pages
+    # Card 5: Lot Hazard & Illegal Dumping Report (#1)
+    with st.container(border=True):
+        st.subheader("🚨 Lot Hazard & Dumping Report")
+        st.write("Snap a photo of blocked lots, illegal bulk dumping, or site damage and email timestamped proof.")
+        if st.button("Report Lot Hazard / Dumping →", type="primary", use_container_width=True):
+            navigate_to("hazard_report")
+
+    # Card 6: Hopper Dump, Fuel & Maintenance Log (#2)
+    with st.container(border=True):
+        st.subheader("⛽ Hopper Dump, Fuel & Maintenance")
+        st.write("Log fuel receipts, hopper dump loads, and sweeper broom/hydraulic repair requests.")
+        if st.button("Open Fleet & Fuel Log →", type="primary", use_container_width=True):
+            navigate_to("maintenance_log")
+
+    # Card 7: Site Notes, Gate Codes & Contacts Directory (#5)
+    with st.container(border=True):
+        st.subheader("🔑 Site Notes, Gate Codes & Contacts")
+        st.write("Quick lookup for store addresses, service schedules, gate/water notes, and emergency contacts.")
+        if st.button("Open Site Directory →", type="primary", use_container_width=True):
+            navigate_to("site_directory")
+
+    # Card 8: Placeholder for Upcoming Pages
     with st.container(border=True):
         st.subheader("🧰 More Tools Coming Soon")
         st.caption("DMG Pro Cross-Reference Audit and Snow / L&L Logs will live right here.")
@@ -486,8 +734,7 @@ def render_visit_log_page():
     tot_amt = float(summary_df["Amount"].sum())
     has_unsaved = (tot_visits > 0) and (not st.session_state.log_submitted)
 
-    # Top Navigation Bar with Back Button
-    nav_col1, nav_col2 = st.columns([1.4, 2.6])
+    nav_col1, _ = st.columns([1.4, 2.6])
     with nav_col1:
         if st.button("← Back to Home", key="top_back_log", use_container_width=True):
             if has_unsaved:
@@ -496,7 +743,6 @@ def render_visit_log_page():
             else:
                 navigate_to("home")
 
-    # Unsaved Changes Warning Banner
     if st.session_state.confirm_leave_log and has_unsaved:
         with st.container(border=True):
             st.error(
@@ -547,7 +793,6 @@ def render_visit_log_page():
 
     st.divider()
 
-    # --- STEP 1: TAP DATES VISITED BY ACCOUNT ---
     st.subheader("1. Select Dates Visited")
     accounts = [
         "King Soopers",
@@ -613,7 +858,6 @@ def render_visit_log_page():
                 st.session_state.open_calendar = None
                 st.rerun()
 
-    # Optional One-Off / Bulk Trash section
     with st.expander(
         "➕ Add One-Off Job (e.g., Bulk Trash)",
         expanded=(st.session_state.open_account == "extra_job" or st.session_state.open_calendar == "extra_job"),
@@ -670,7 +914,6 @@ def render_visit_log_page():
 
     st.divider()
 
-    # --- STEP 2: REVIEW & SUBMIT ---
     st.subheader("2. Download PDF & Email Completed Log")
     active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
 
@@ -752,7 +995,6 @@ def render_route_optimizer_page():
         st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
         round_trip = st.checkbox("Return to Lakewood", value=True)
 
-    # Split stops into Commonly Scheduled for selected day vs. Flexible / Optional stops
     scheduled_stops = [s for s in ROUTE_STOPS if selected_day in s["days"]]
     flex_stops = [s for s in ROUTE_STOPS if selected_day not in s["days"]]
 
@@ -795,7 +1037,6 @@ def render_route_optimizer_page():
 
         st.dataframe(pd.DataFrame(route_rows), use_container_width=True, hide_index=True)
 
-        # Build plain newline-separated address list for RouteXL.com bulk paste
         address_lines = [HOME_BASE["address"]] + [s["address"] for s in ordered]
         if round_trip:
             address_lines.append(HOME_BASE["address"])
@@ -921,6 +1162,282 @@ def render_insurance_upload_page():
 
 
 # ==============================================================================
+# PAGE 5: LOT HAZARD & ILLEGAL DUMPING REPORT (#1)
+# ==============================================================================
+def render_hazard_report_page():
+    if st.button("← Back to Home", key="top_back_haz"):
+        navigate_to("home")
+
+    st.title("🚨 Lot Hazard & Dumping Report")
+    st.caption("Document blocked areas, illegal bulk dumping, or lot damage with a timestamped photo and email proof.")
+
+    store_options = [f"{s['store']} — {s['address']}" for s in ROUTE_STOPS] + ["Other / Custom Location"]
+
+    with st.container(border=True):
+        tech_name = st.text_input("Tech Name *", placeholder="Enter your name", key="haz_tech")
+        selected_store = st.selectbox("Select Store / Property *", options=store_options)
+
+        if selected_store == "Other / Custom Location":
+            store_name = st.text_input("Custom Location Name *", placeholder="e.g., King Soopers - Colfax")
+            store_address = st.text_input("Custom Street Address *", placeholder="e.g., 1234 E Colfax Ave, Denver, CO")
+        else:
+            store_name, store_address = selected_store.split(" — ", 1)
+
+        st.markdown("**Select Issue(s) Observed ***")
+        issue_choices = [
+            "Blocked by Parked Vehicles / Semis",
+            "Illegal Bulk Dumping (Furniture / Mattresses / Construction)",
+            "Pothole / Broken Curb / Asphalt Damage",
+            "Parking Lot / Canopy Lighting Outage",
+            "Clogged Storm Drain / Standing Water",
+            "Construction Fencing / Inaccessible Dock",
+        ]
+        selected_issues = [ic for ic in issue_choices if st.checkbox(ic, key=f"haz_chk_{ic}")]
+
+        severity = st.selectbox(
+            "Impact on Service",
+            options=[
+                "Partial Access — Swept Around Obstacle",
+                "Blocked — Could Not Service Section",
+                "Bulk Haul-Off Quote Needed",
+                "Safety / Liability Hazard Notice",
+            ],
+        )
+
+        details = st.text_area(
+            "Field Notes / Specific Area",
+            placeholder="e.g., Two semi-trailers parked across rear receiving dock; mattress pile behind north garden center.",
+            height=90,
+        )
+
+        st.markdown("**📸 Photo Proof (Camera or Gallery Upload)**")
+        photo_mode = st.radio(
+            "Photo Source",
+            options=["Upload from Phone / Gallery", "Take Live Photo with Camera"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        photo_file = None
+        if photo_mode == "Take Live Photo with Camera":
+            photo_file = st.camera_input("Snap photo of hazard or blocked area")
+        else:
+            photo_file = st.file_uploader("Upload photo", type=["jpg", "jpeg", "png", "webp"], label_visibility="collapsed")
+
+        if st.button("📧 Email Timestamped Hazard Report", type="primary", use_container_width=True):
+            if not tech_name.strip() or not store_name.strip():
+                st.warning("Please enter your name and select or enter the store location.")
+            elif not selected_issues and not details.strip():
+                st.warning("Please check at least one issue or enter field notes.")
+            else:
+                try:
+                    ts_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                    p_bytes = photo_file.getvalue() if photo_file is not None else None
+                    p_name = photo_file.name if (photo_file is not None and hasattr(photo_file, "name")) else "hazard_photo.jpg"
+                    p_ext = p_name.split(".")[-1] if "." in p_name else "jpg"
+
+                    haz_pdf = generate_hazard_pdf(
+                        tech_name=tech_name,
+                        store_name=store_name,
+                        store_address=store_address,
+                        timestamp_str=ts_str,
+                        issues=selected_issues,
+                        severity=severity,
+                        details=details,
+                        photo_bytes=p_bytes,
+                        photo_ext=p_ext,
+                    )
+                    send_hazard_email(
+                        pdf_bytes=haz_pdf,
+                        tech_name=tech_name,
+                        store_name=store_name,
+                        store_address=store_address,
+                        timestamp_str=ts_str,
+                        issues=selected_issues,
+                        severity=severity,
+                        details=details,
+                        photo_bytes=p_bytes,
+                        photo_filename=p_name,
+                    )
+                    st.success(f"Sent! Timestamped hazard report for **{store_name}** emailed to the team.")
+                except Exception as e:
+                    st.error(f"Could not send report — check Streamlit Secrets email settings. Details: {e}")
+
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_haz", use_container_width=True):
+        navigate_to("home")
+
+
+# ==============================================================================
+# PAGE 6: HOPPER DUMP, FUEL & MAINTENANCE LOG (#2)
+# ==============================================================================
+def render_maintenance_log_page():
+    if st.button("← Back to Home", key="top_back_maint"):
+        navigate_to("home")
+
+    st.title("⛽ Hopper Dump, Fuel & Maintenance")
+    st.caption("Log fuel fill-ups, hopper dump loads, and sweeper parts or repair needs.")
+
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            tech_name = st.text_input("Tech / Driver Name *", placeholder="Enter your name", key="mnt_tech")
+        with col2:
+            unit_num = st.text_input("Truck / Sweeper Unit # *", placeholder="e.g., Unit 1 / Schwarze A4")
+
+        col3, col4 = st.columns(2)
+        with col3:
+            log_date = st.date_input("Date *", value=date.today(), key="mnt_date")
+        with col4:
+            odometer_hrs = st.text_input("Odometer / Aux Hours", placeholder="e.g., 84,210 mi / 1,420 hrs")
+
+        log_types = st.multiselect(
+            "What are you logging today? *",
+            options=["Fuel Fill-Up", "Hopper Dump", "Parts / Repair Needed"],
+            default=["Fuel Fill-Up"],
+        )
+
+        fuel_gallons = 0.0
+        fuel_cost = 0.0
+        if "Fuel Fill-Up" in log_types:
+            st.markdown("**⛽ Fuel Details**")
+            f1, f2 = st.columns(2)
+            with f1:
+                fuel_gallons = st.number_input("Gallons Pumped", min_value=0.0, value=0.0, step=0.5)
+            with f2:
+                fuel_cost = st.number_input("Total Fuel Cost ($)", min_value=0.0, value=0.0, step=1.0)
+
+        dump_location = ""
+        dump_load = "N/A"
+        if "Hopper Dump" in log_types:
+            st.markdown("**🗑️ Hopper Dump Details**")
+            d1, d2 = st.columns(2)
+            with d1:
+                dump_location = st.text_input("Dump Site / Transfer Station", placeholder="e.g., HQ Roll-off / DADS Landfill")
+            with d2:
+                dump_load = st.selectbox("Estimated Hopper Load", options=["1/4 Full", "1/2 Full", "3/4 Full", "Full Load"])
+
+        repair_items = []
+        if "Parts / Repair Needed" in log_types:
+            st.markdown("**🔧 Flag Parts / Repair Items**")
+            part_choices = [
+                "Main Tube Broom Worn",
+                "Side Gutter Brush Worn",
+                "Hydraulic Hose / Fluid Leak",
+                "Water Dust-Suppression Nozzle / Pump",
+                "Suction Hood / Rubber Flaps",
+                "Strobe / Work / Headlights",
+                "Tires / Brakes / Suspension",
+                "Auxiliary Engine Issue",
+            ]
+            c_p1, c_p2 = st.columns(2)
+            for idx, item in enumerate(part_choices):
+                target_col = c_p1 if idx % 2 == 0 else c_p2
+                with target_col:
+                    if st.checkbox(item, key=f"prt_{idx}"):
+                        repair_items.append(item)
+
+        notes = st.text_area(
+            "Notes / Receipt Details",
+            placeholder="Any station details, urgent repair notes, or part numbers...",
+            height=80,
+        )
+
+        attachment = st.file_uploader(
+            "Attach Fuel Receipt or Repair Photo (Optional)",
+            type=["jpg", "jpeg", "png", "pdf"],
+        )
+
+        if st.button("📧 Email Fleet & Fuel Log to Team", type="primary", use_container_width=True):
+            if not tech_name.strip() or not unit_num.strip():
+                st.warning("Please enter your Name and Truck / Sweeper Unit #.")
+            elif not log_types:
+                st.warning("Select at least one log category above.")
+            else:
+                try:
+                    att_bytes = attachment.getvalue() if attachment is not None else None
+                    att_name = attachment.name if attachment is not None else ""
+                    send_maintenance_email(
+                        tech_name=tech_name,
+                        unit_num=unit_num,
+                        log_date=log_date.strftime("%Y-%m-%d"),
+                        log_types=log_types,
+                        odometer_hrs=odometer_hrs,
+                        fuel_gallons=fuel_gallons,
+                        fuel_cost=fuel_cost,
+                        dump_location=dump_location,
+                        dump_load=dump_load,
+                        repair_items=repair_items,
+                        notes=notes,
+                        attachment_bytes=att_bytes,
+                        attachment_name=att_name,
+                    )
+                    st.success(f"Sent! Fleet & Fuel log for **{unit_num}** emailed to the team.")
+                except Exception as e:
+                    st.error(f"Could not send log — check Streamlit Secrets email settings. Details: {e}")
+
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_maint", use_container_width=True):
+        navigate_to("home")
+
+
+# ==============================================================================
+# PAGE 7: SITE NOTES, GATE CODES & CONTACTS DIRECTORY (#5)
+# ==============================================================================
+def render_site_directory_page():
+    if st.button("← Back to Home", key="top_back_dir"):
+        navigate_to("home")
+
+    st.title("🔑 Site Notes, Gate Codes & Contacts")
+    st.caption("Quick reference for store addresses, service lines, gate/water access, and dispatch contacts.")
+
+    with st.container(border=True):
+        st.subheader("📞 Dispatch & Emergency Contacts")
+        for ec in EMERGENCY_CONTACTS:
+            st.markdown(f"**{ec['role']}:** {ec['contact']}")
+
+    st.divider()
+
+    f_col1, f_col2 = st.columns([2.2, 1.2])
+    with f_col1:
+        search_q = st.text_input("Search Store or Address", placeholder="e.g., Lowe's, Holly, 80120...")
+    with f_col2:
+        line_filter = st.selectbox("Service Line", options=["All", "Sweep", "Dual"])
+
+    filtered_stops = []
+    for s in ROUTE_STOPS:
+        if line_filter != "All" and s["line"] != line_filter:
+            continue
+        if search_q.strip():
+            q = search_q.strip().lower()
+            if q not in s["store"].lower() and q not in s["address"].lower():
+                continue
+        filtered_stops.append(s)
+
+    st.caption(f"Showing **{len(filtered_stops)}** of {len(ROUTE_STOPS)} locations")
+
+    for s in filtered_stops:
+        sched_label = ", ".join(s["days"]) if s["days"] else f"Flexible ({s['flex']})"
+        note_info = SITE_NOTES.get(
+            s["id"],
+            {
+                "gate": "Standard open parking lot / check rear receiving dock",
+                "water": "Fill dust-control tank at Lakewood HQ",
+                "curfew": "Run amber strobes; follow standard overnight noise courtesy",
+            },
+        )
+        with st.expander(f"**{s['store']}** ({s['line']}) — {sched_label}"):
+            st.markdown(f"📍 **Address:** `{s['address']}`")
+            st.markdown(f"📅 **Schedule:** {sched_label}  |  **Flex Rule:** {s['flex']}")
+            st.markdown(f"🔐 **Gate / Lot Access:** {note_info['gate']}")
+            st.markdown(f"💧 **Water Hookup:** {note_info['water']}")
+            st.markdown(f"🌙 **Nightly Notes:** {note_info['curfew']}")
+
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_dir", use_container_width=True):
+        navigate_to("home")
+
+
+# ==============================================================================
 # ROUTER
 # ==============================================================================
 if st.session_state.current_page == "home":
@@ -931,3 +1448,9 @@ elif st.session_state.current_page == "route_optimizer":
     render_route_optimizer_page()
 elif st.session_state.current_page == "insurance_upload":
     render_insurance_upload_page()
+elif st.session_state.current_page == "hazard_report":
+    render_hazard_report_page()
+elif st.session_state.current_page == "maintenance_log":
+    render_maintenance_log_page()
+elif st.session_state.current_page == "site_directory":
+    render_site_directory_page()
