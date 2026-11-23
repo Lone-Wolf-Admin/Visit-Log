@@ -152,48 +152,33 @@ ROUTE_STOPS = [
     {"id": "r_lo_whe", "store": "Lowe's - Wheatlands (Mon + 1 Flex)", "address": "24505 E Wheatlands Pkwy, Aurora, CO 80016", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5919, "lon": -104.7024},
 ]
 
-# Site Directory Notes (Customize gate codes, water hookups, and noise curfews per store ID)
+# Site Directory Notes
 EMERGENCY_CONTACTS = [
-    {"role": "Lone Wolf Dispatch / Operations", "contact": "Check team thread or email dispatch"},
     {"role": "DMG Pro Support (Work Orders)", "contact": "Log check-in/out inside DMG Pro app before leaving lot"},
     {"role": "Non-Emergency Police (Denver Metro)", "contact": "Denver: (720) 913-2000 | Aurora: (303) 627-3100 | Arapahoe/Douglas: (303) 795-4711"},
 ]
 
 SITE_NOTES = {
     "r_ks_ark": {
-        "gate": "Open lot — check rear dock & perimeter for bulk dumping",
-        "water": "Standard tank fill at HQ before departure",
-        "curfew": "Watch residential border on east side; keep blower idle down near homes",
+        "curfew": "Watch residential border on east side; keep blower idle down near homes. Report discrepancies or issues to Lone Wolf.",
     },
     "r_ks_lee": {
-        "gate": "7-day/wk high-traffic lot — sweep after midnight close",
-        "water": "Fill at HQ",
-        "curfew": "High pedestrian/late-night traffic; run amber strobes",
+        "curfew": "High pedestrian/late-night traffic; run amber strobes. Report discrepancies or issues to Lone Wolf.",
     },
     "r_lo_pea": {
-        "gate": "Pro canopy & garden center perimeter — watch for pallet stacks",
-        "water": "Fill at HQ",
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri); check lumber aisle apron",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri); check lumber aisle apron. Report discrepancies or issues to Lone Wolf.",
     },
     "r_lo_san": {
-        "gate": "Check south lumber gate & rear receiving lane",
-        "water": "Fill at HQ",
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
     },
     "r_lo_buc": {
-        "gate": "Check rear dock & garden center curb line",
-        "water": "Fill at HQ",
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
     },
     "r_lo_20m": {
-        "gate": "Check rear loading dock & contractor parking",
-        "water": "Fill at HQ",
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
     },
     "r_lo_whe": {
-        "gate": "Open perimeter — watch windblown debris along east fence",
-        "water": "Fill at HQ",
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri)",
+        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
     },
 }
 
@@ -587,8 +572,6 @@ def send_maintenance_email(
     log_date: str,
     log_types: list[str],
     odometer_hrs: str,
-    fuel_gallons: float,
-    fuel_cost: float,
     dump_location: str,
     dump_load: str,
     repair_items: list[str],
@@ -604,20 +587,17 @@ def send_maintenance_email(
 
     summary_tag = ", ".join(log_types) if log_types else "Shift Log"
     msg = EmailMessage()
-    msg["Subject"] = f"Fleet / Hopper / Fuel Log — {unit_num} ({summary_tag} | {log_date})"
+    msg["Subject"] = f"Hopper / Maintenance Log — {unit_num} ({summary_tag} | {log_date})"
     msg["From"] = sender
     msg["To"] = recipient
     msg.set_content(
         f"Hi Team,\n\n"
-        f"A new Fleet, Fuel & Hopper Dump Log has been submitted.\n\n"
+        f"A new Hopper Dump & Maintenance Log has been submitted.\n\n"
         f"- Tech / Driver: {tech_name.strip()}\n"
         f"- Truck / Unit #: {unit_num.strip()}\n"
         f"- Date: {log_date}\n"
         f"- Odometer / Aux Hours: {odometer_hrs.strip() or 'N/A'}\n"
         f"- Log Categories: {summary_tag}\n\n"
-        f"--- FUEL ---\n"
-        f"- Gallons: {fuel_gallons:.2f} gal\n"
-        f"- Total Cost: ${fuel_cost:,.2f}\n\n"
         f"--- HOPPER DUMP ---\n"
         f"- Dump Site / Facility: {dump_location.strip() or 'N/A'}\n"
         f"- Estimated Load: {dump_load}\n\n"
@@ -691,33 +671,33 @@ def render_home_page():
         st.write("Complete your pre-trip / post-trip vehicle & sweeper inspection and log it directly to the team sheet.")
         st.link_button("Open Vehicle Checklist →", VEHICLE_CHECKLIST_URL, type="primary", use_container_width=True)
 
-    # Card 4: Insurance Policy & COI Upload
-    with st.container(border=True):
-        st.subheader("🛡️ Insurance Policy & COI Upload")
-        st.write("Submit your policy details, drop a copy of your insurance PDF, and email it directly to the team.")
-        if st.button("Upload Insurance Policy →", type="primary", use_container_width=True):
-            navigate_to("insurance_upload")
-
-    # Card 5: Lot Hazard & Illegal Dumping Report (#1)
+    # Card 4: Lot Hazard & Illegal Dumping Report
     with st.container(border=True):
         st.subheader("🚨 Lot Hazard & Dumping Report")
         st.write("Snap a photo of blocked lots, illegal bulk dumping, or site damage and email timestamped proof.")
         if st.button("Report Lot Hazard / Dumping →", type="primary", use_container_width=True):
             navigate_to("hazard_report")
 
-    # Card 6: Hopper Dump, Fuel & Maintenance Log (#2)
+    # Card 5: Hopper Dump & Maintenance Log
     with st.container(border=True):
-        st.subheader("⛽ Hopper Dump, Fuel & Maintenance")
-        st.write("Log fuel receipts, hopper dump loads, and sweeper broom/hydraulic repair requests.")
-        if st.button("Open Fleet & Fuel Log →", type="primary", use_container_width=True):
+        st.subheader("🗑️ Hopper Dump & Maintenance")
+        st.write("Log hopper dump loads and sweeper broom, hydraulic, or equipment repair requests.")
+        if st.button("Open Hopper & Maintenance Log →", type="primary", use_container_width=True):
             navigate_to("maintenance_log")
 
-    # Card 7: Site Notes, Gate Codes & Contacts Directory (#5)
+    # Card 6: Site Notes, Gate Codes & Contacts Directory
     with st.container(border=True):
         st.subheader("🔑 Site Notes, Gate Codes & Contacts")
-        st.write("Quick lookup for store addresses, service schedules, gate/water notes, and emergency contacts.")
+        st.write("Quick lookup for store addresses, service schedules, lot access, and emergency contacts.")
         if st.button("Open Site Directory →", type="primary", use_container_width=True):
             navigate_to("site_directory")
+
+    # Card 7: Insurance Policy & COI Upload
+    with st.container(border=True):
+        st.subheader("🛡️ Insurance Policy & COI Upload")
+        st.write("Submit your policy details, drop a copy of your insurance PDF, and email it directly to the team.")
+        if st.button("Upload Insurance Policy →", type="primary", use_container_width=True):
+            navigate_to("insurance_upload")
 
     # Card 8: Placeholder for Upcoming Pages
     with st.container(border=True):
@@ -1162,7 +1142,7 @@ def render_insurance_upload_page():
 
 
 # ==============================================================================
-# PAGE 5: LOT HAZARD & ILLEGAL DUMPING REPORT (#1)
+# PAGE 5: LOT HAZARD & ILLEGAL DUMPING REPORT
 # ==============================================================================
 def render_hazard_report_page():
     if st.button("← Back to Home", key="top_back_haz"):
@@ -1268,14 +1248,14 @@ def render_hazard_report_page():
 
 
 # ==============================================================================
-# PAGE 6: HOPPER DUMP, FUEL & MAINTENANCE LOG (#2)
+# PAGE 6: HOPPER DUMP & MAINTENANCE LOG
 # ==============================================================================
 def render_maintenance_log_page():
     if st.button("← Back to Home", key="top_back_maint"):
         navigate_to("home")
 
-    st.title("⛽ Hopper Dump, Fuel & Maintenance")
-    st.caption("Log fuel fill-ups, hopper dump loads, and sweeper parts or repair needs.")
+    st.title("🗑️ Hopper Dump & Maintenance")
+    st.caption("Log hopper dump loads and sweeper parts or repair needs.")
 
     with st.container(border=True):
         col1, col2 = st.columns(2)
@@ -1292,19 +1272,9 @@ def render_maintenance_log_page():
 
         log_types = st.multiselect(
             "What are you logging today? *",
-            options=["Fuel Fill-Up", "Hopper Dump", "Parts / Repair Needed"],
-            default=["Fuel Fill-Up"],
+            options=["Hopper Dump", "Parts / Repair Needed"],
+            default=["Hopper Dump"],
         )
-
-        fuel_gallons = 0.0
-        fuel_cost = 0.0
-        if "Fuel Fill-Up" in log_types:
-            st.markdown("**⛽ Fuel Details**")
-            f1, f2 = st.columns(2)
-            with f1:
-                fuel_gallons = st.number_input("Gallons Pumped", min_value=0.0, value=0.0, step=0.5)
-            with f2:
-                fuel_cost = st.number_input("Total Fuel Cost ($)", min_value=0.0, value=0.0, step=1.0)
 
         dump_location = ""
         dump_load = "N/A"
@@ -1337,17 +1307,17 @@ def render_maintenance_log_page():
                         repair_items.append(item)
 
         notes = st.text_area(
-            "Notes / Receipt Details",
-            placeholder="Any station details, urgent repair notes, or part numbers...",
+            "Notes / Details",
+            placeholder="Any dump ticket details, urgent repair notes, or part numbers...",
             height=80,
         )
 
         attachment = st.file_uploader(
-            "Attach Fuel Receipt or Repair Photo (Optional)",
+            "Attach Dump Ticket or Repair Photo (Optional)",
             type=["jpg", "jpeg", "png", "pdf"],
         )
 
-        if st.button("📧 Email Fleet & Fuel Log to Team", type="primary", use_container_width=True):
+        if st.button("📧 Email Hopper & Maintenance Log to Team", type="primary", use_container_width=True):
             if not tech_name.strip() or not unit_num.strip():
                 st.warning("Please enter your Name and Truck / Sweeper Unit #.")
             elif not log_types:
@@ -1362,8 +1332,6 @@ def render_maintenance_log_page():
                         log_date=log_date.strftime("%Y-%m-%d"),
                         log_types=log_types,
                         odometer_hrs=odometer_hrs,
-                        fuel_gallons=fuel_gallons,
-                        fuel_cost=fuel_cost,
                         dump_location=dump_location,
                         dump_load=dump_load,
                         repair_items=repair_items,
@@ -1371,7 +1339,7 @@ def render_maintenance_log_page():
                         attachment_bytes=att_bytes,
                         attachment_name=att_name,
                     )
-                    st.success(f"Sent! Fleet & Fuel log for **{unit_num}** emailed to the team.")
+                    st.success(f"Sent! Hopper & Maintenance log for **{unit_num}** emailed to the team.")
                 except Exception as e:
                     st.error(f"Could not send log — check Streamlit Secrets email settings. Details: {e}")
 
@@ -1381,17 +1349,23 @@ def render_maintenance_log_page():
 
 
 # ==============================================================================
-# PAGE 7: SITE NOTES, GATE CODES & CONTACTS DIRECTORY (#5)
+# PAGE 7: SITE NOTES, GATE CODES & CONTACTS DIRECTORY
 # ==============================================================================
 def render_site_directory_page():
     if st.button("← Back to Home", key="top_back_dir"):
         navigate_to("home")
 
     st.title("🔑 Site Notes, Gate Codes & Contacts")
-    st.caption("Quick reference for store addresses, service lines, gate/water access, and dispatch contacts.")
+    st.caption("Quick reference for store addresses, service lines, lot access, and dispatch contacts.")
 
     with st.container(border=True):
         st.subheader("📞 Dispatch & Emergency Contacts")
+        st.link_button(
+            "💬 Text Lone Wolf Dispatch (1-719-434-0294)",
+            "sms:+17194340294",
+            type="primary",
+            use_container_width=True,
+        )
         for ec in EMERGENCY_CONTACTS:
             st.markdown(f"**{ec['role']}:** {ec['contact']}")
 
@@ -1420,16 +1394,13 @@ def render_site_directory_page():
         note_info = SITE_NOTES.get(
             s["id"],
             {
-                "gate": "Standard open parking lot / check rear receiving dock",
-                "water": "Fill dust-control tank at Lakewood HQ",
-                "curfew": "Run amber strobes; follow standard overnight noise courtesy",
+                "curfew": "Run amber strobes; follow standard overnight noise courtesy. Report discrepancies or issues to Lone Wolf.",
             },
         )
         with st.expander(f"**{s['store']}** ({s['line']}) — {sched_label}"):
             st.markdown(f"📍 **Address:** `{s['address']}`")
             st.markdown(f"📅 **Schedule:** {sched_label}  |  **Flex Rule:** {s['flex']}")
-            st.markdown(f"🔐 **Gate / Lot Access:** {note_info['gate']}")
-            st.markdown(f"💧 **Water Hookup:** {note_info['water']}")
+            st.markdown("🔐 **Gate / Lot Access:** Open")
             st.markdown(f"🌙 **Nightly Notes:** {note_info['curfew']}")
 
     st.divider()
