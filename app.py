@@ -14,6 +14,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+VEHICLE_CHECKLIST_URL = (
+    "https://docs.google.com/forms/d/e/"
+    "1FAIpQLSfCzvudWQIQ1CwfNm4CFThLVaklEv3sz2JVIQ6HCjsQw0xHrw/"
+    "viewform?usp=sharing&ouid=118278623880257833513"
+)
+
 # Mobile-first CSS: clears the top Streamlit banner, keeps the 7-column calendar grid on 1 row, and styles buttons
 st.markdown(
     """
@@ -403,10 +409,16 @@ def render_home_page():
         if st.button("Open Route Optimizer →", type="primary", use_container_width=True):
             navigate_to("route_optimizer")
 
-    # Card 3: Placeholder for Upcoming Pages
+    # Card 3: Vehicle & Equipment Checklist (Logs straight to existing Google Form)
+    with st.container(border=True):
+        st.subheader("🚚 Vehicle & Equipment Checklist")
+        st.write("Complete your pre-trip / post-trip vehicle & sweeper inspection and log it directly to the team sheet.")
+        st.link_button("Open Vehicle Checklist →", VEHICLE_CHECKLIST_URL, type="primary", use_container_width=True)
+
+    # Card 4: Placeholder for Upcoming Pages
     with st.container(border=True):
         st.subheader("🧰 More Tools Coming Soon")
-        st.caption("DMG Pro Cross-Reference Audit, Snow / L&L Logs, and Equipment Checklists will live right here.")
+        st.caption("DMG Pro Cross-Reference Audit and Snow / L&L Logs will live right here.")
 
 
 # ==============================================================================
