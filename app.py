@@ -674,20 +674,20 @@ def render_route_optimizer_page():
         st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
         round_trip = st.checkbox("Return to Lakewood", value=True)
 
-    # Split stops into Mandatory for selected day vs. Flexible / Other stops
+    # Split stops into Commonly Scheduled for selected day vs. Flexible / Optional stops
     scheduled_stops = [s for s in ROUTE_STOPS if selected_day in s["days"]]
     flex_stops = [s for s in ROUTE_STOPS if selected_day not in s["days"]]
 
-    st.subheader(f"1. Scheduled Stops for {selected_day} ({len(scheduled_stops)})")
+    st.subheader(f"1. Commonly Scheduled Stops for {selected_day} ({len(scheduled_stops)})")
     selected_stop_ids = []
     if scheduled_stops:
         for s in scheduled_stops:
             if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=True, key=f"sch_{s['id']}"):
                 selected_stop_ids.append(s["id"])
     else:
-        st.info(f"Only King Soopers Leetsdale is fixed on {selected_day}s. Add flexible stops below.")
+        st.info(f"Only King Soopers Leetsdale is commonly scheduled on {selected_day}s. Add flexible or other stops below.")
 
-    with st.expander(f"➕ Add Flexible / Extra Stops ({len(flex_stops)} available)", expanded=(selected_day in ["Wed", "Thu", "Fri", "Sat"])):
+    with st.expander(f"➕ Add Flexible / Optional Stops ({len(flex_stops)} available)", expanded=(selected_day in ["Wed", "Thu", "Fri", "Sat"])):
         for s in flex_stops:
             if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=False, key=f"flx_{s['id']}"):
                 selected_stop_ids.append(s["id"])
