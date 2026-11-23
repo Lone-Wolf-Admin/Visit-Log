@@ -14,11 +14,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Mobile-first CSS: keeps the 7-column calendar grid on 1 row on Android screens and styles cards/buttons
+# Mobile-first CSS: clears the top Streamlit banner, keeps the 7-column calendar grid on 1 row, and styles buttons
 st.markdown(
     """
     <style>
-    .block-container { padding-top: 1.2rem; padding-bottom: 3rem; max-width: 680px; }
+    header[data-testid="stHeader"] { background: transparent !important; }
+    div[data-testid="stToolbar"] { display: none !important; }
+    .block-container { padding-top: 3.5rem; padding-bottom: 3.5rem; max-width: 680px; }
 
     /* Force 7-column calendar rows to stay side-by-side on mobile phones instead of stacking */
     div[data-testid="stHorizontalBlock"]:has(div[data-testid="stColumn"]:nth-child(7)) {
@@ -419,7 +421,7 @@ def render_visit_log_page():
     # Top Navigation Bar with Back Button
     nav_col1, nav_col2 = st.columns([1.4, 2.6])
     with nav_col1:
-        if st.button("← Back to Home", use_container_width=True):
+        if st.button("← Back to Home", key="top_back_log", use_container_width=True):
             if has_unsaved:
                 st.session_state.confirm_leave_log = True
                 st.rerun()
@@ -653,12 +655,20 @@ def render_visit_log_page():
             except Exception as e:
                 st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
 
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_log", use_container_width=True):
+        if has_unsaved:
+            st.session_state.confirm_leave_log = True
+            st.rerun()
+        else:
+            navigate_to("home")
+
 
 # ==============================================================================
 # PAGE 3: DENVER ROUTE OPTIMIZER
 # ==============================================================================
 def render_route_optimizer_page():
-    if st.button("← Back to Home"):
+    if st.button("← Back to Home", key="top_back_route"):
         navigate_to("home")
 
     st.title("🗺️ Denver Route Optimizer")
@@ -734,6 +744,10 @@ def render_route_optimizer_page():
                 st.info(f"Address list ready ({len(ordered)} stops) — tap the copy icon in the top-right corner of the box above.")
         with c_launch:
             st.link_button("🚀 Launch RouteXL.com", "https://www.routexl.com", type="primary", use_container_width=True)
+
+    st.divider()
+    if st.button("← Back to Home", key="bottom_back_route", use_container_width=True):
+        navigate_to("home")
 
 
 # ==============================================================================
