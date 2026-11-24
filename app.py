@@ -1475,4 +1475,225 @@ def render_hazard_report_page():
             else:
                 try:
                     ts_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-                    p_bytes = photo_file.getvalue() if photo_file is not
+                    p_bytes = photo_file.getvalue() if photo_file is not None else None
+                    p_name = photo_file.name if (photo_file is not None and hasattr(photo_file, "name")) else "hazard_photo.jpg"
+                    p_ext = p_name.split(".")[-1] if "." in p_name else "jpg"
+
+                    haz_pdf = generate_hazard_pdf(
+                        tech_name=tech_name,
+                        region_name=reg_data["name"],
+                        store_name=store_name,
+                        store_address=store_address,
+                        timestamp_str=ts_str,
+                        issues=selected_issues,
+                        severity=severity,
+                        details=details,
+                        photo_bytes=p_bytes,
+                        photo_ext=p_ext,
+                    )
+                    send_hazard_email(
+                        pdf_bytes=haz_pdf,
+                        region_name=reg_data["name"],
+                        tech_name=tech_name,
+                        store_name=store_name,
+                        store_address=store_address,
+                        timestamp_str=ts_str,
+                        issues=selected_issues,
+                        severity=severity,
+                        details=details,
+                        photo_bytes=p_bytes,
+                        photo_filename=p_name,
+                    )
+                    st.success(f"Sent! Timestamped hazard report for **{store_name}** emailed to the team.")
+                except Exception as e:
+                    st.error(f"Could not send report — check Streamlit Secrets email settings. Details: {e}")
+
+    st.divider()
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_haz", use_container_width=True):
+        navigate_to("hub")
+
+
+# ==============================================================================
+# PAGE 6: HOPPER DUMP & MAINTENANCE LOG
+# ==============================================================================
+def render_maintenance_log_page():
+    _, reg_data = get_active_region()
+
+    if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_maint"):
+        navigate_to("hub")
+
+    st.title(f"🗑️ {reg_data['name']} Hopper & Maintenance")
+    st.caption("Log hopper dump loads and sweeper parts or repair needs.")
+
+    with st.container(border=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            tech_name = st.text_input("Tech / Driver Name *", placeholder="Enter your name", key="mnt_tech")
+        with col2:
+            unit_num = st.text_input("Truck / Sweeper Unit # *", placeholder="e.g., Unit 1 / Schwarze A4")
+
+        col3, col4 = st.columns(2)
+        with col3:
+            log_date = st.date_input("Date *", value=date.today(), key="mnt_date")
+        with col4:
+            odometer_hrs = st.text_input("Odometer / Aux Hours", placeholder="e.g., 84,210 mi / 1,420 hrs")
+
+        log_types = st.multiselect(
+            "What are you logging today? *",
+            options=["Hopper Dump", "Parts / Repair Needed"],
+            default=["Hopper Dump"],
+        )
+
+        dump_location = ""
+        dump_load = "N/A"
+        if "Hopper Dump" in log_types:
+            st.markdown("**🗑️ Hopper Dump Details**")
+            d1, d2 = st.columns(2)
+            with d1:
+                dump_location = st.text_input("Dump Site / Transfer Station", placeholder="e.g., HQ Roll-off / Transfer Station")
+            with d2:
+                dump_load = st.selectbox("Estimated Hopper Load", options=["1/4 Full", "1/2 Full", "3/4 Full", "Full Load"])
+
+        repair_items = []
+        if "Parts / Repair Needed" in log_types:
+            st.markdown("**🔧 Flag Parts / Repair Items**")
+            part_choices = [
+                "Main Tube Broom Worn",
+                "Side Gutter Brush Worn",
+                "Hydraulic Hose / Fluid Leak",
+                "Water Dust-Suppression Nozzle / Pump",
+                "Suction Hood / Rubber Flaps",
+                "Strobe / Work / Headlights",
+                "Tires / Brakes / Suspension",
+                "Auxiliary Engine Issue",
+            ]
+            c_p1, c_p2 = st.columns(2)
+            for idx, item in enumerate(part_choices):
+                target_col = c_p1 if idx % 2 == 0 else c_p2
+                with target_col:
+                    if st.checkbox(item, key=f"prt_{idx}"):
+                        repair_items.append(item)
+
+        notes = st.text_area(
+            "Notes / Details",
+            placeholder="Any dump ticket details, urgent repair notes, or part numbers...",
+            height=80,
+        )
+
+        attachment = st.file_uploader(
+            "Attach Dump Ticket or Repair Photo (Optional)",
+            type=["jpg", "jpeg", "png", "pdf"],
+        )
+
+        if st.button("📧 Email Hopper & Maintenance Log to Team", type="primary", use_container_width=True):
+            if not tech_name.strip() or not unit_num.strip():
+                st.warning("Please enter your Name and Truck / Sweeper Unit #.")
+            elif not log_types:
+                st.warning("Select at least one log category above.")
+            else:
+                try:
+                    att_bytes = attachment.getvalue() if attachment is not None else None
+                    att_name = attachment.name if attachment is not None else ""
+                    send_maintenance_email(
+                        region_name=reg_data["name"],
+                        tech_name=tech_name,
+                        unit_num=unit_num,
+                        log_date=log_date.strftime("%Y-%m-%d"),
+                        log_types=log_types,
+                        odometer_hrs=odometer_hrs,
+                        dump_location=dump_location,
+                        dump_load=dump_load,
+                        repair_items=repair_items,
+                        notes=notes,
+                        attachment_bytes=att_bytes,
+                        attachment_name=att_name,
+                    )
+                    st.success(f"Sent! Hopper & Maintenance log for **{unit_num}** emailed to the team.")
+                except Exception as e:
+                    st.error(f"Could not send log — check Streamlit Secrets email settings. Details: {e}")
+
+    st.divider()
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_maint", use_container_width=True):
+        navigate_to("hub")
+
+
+# ==============================================================================
+# PAGE 7: SITE NOTES, GATE CODES & CONTACTS DIRECTORY
+# ==============================================================================
+def render_site_directory_page():
+    _, reg_data = get_active_region()
+    route_stops = reg_data["route_stops"]
+    site_notes = reg_data["site_notes"]
+
+    if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_dir"):
+        navigate_to("hub")
+
+    st.title(f"🔑 {reg_data['name']} Site Notes & Contacts")
+    st.caption("Quick reference for store addresses, service lines, lot access, and dispatch contacts.")
+
+    with st.container(border=True):
+        st.subheader("📞 Dispatch & Emergency Contacts")
+        st.link_button(
+            "💬 Text Lone Wolf Dispatch (1-719-434-0294)",
+            "sms:+17194340294",
+            type="primary",
+            use_container_width=True,
+        )
+        st.markdown("**DMG Pro Support (Work Orders):** Log check-in/out inside DMG Pro app before leaving lot")
+        st.markdown(f"**Non-Emergency Police ({reg_data['name']}):** {reg_data['police_contact']}")
+
+    st.divider()
+
+    f_col1, f_col2 = st.columns([2.2, 1.2])
+    with f_col1:
+        search_q = st.text_input("Search Store or Address", placeholder="e.g., Lowe's, Walgreens, Fountain...")
+    with f_col2:
+        line_filter = st.selectbox("Service Line", options=["All", "Sweep", "Dual"])
+
+    filtered_stops = []
+    for s in route_stops:
+        if line_filter != "All" and s["line"] != line_filter:
+            continue
+        if search_q.strip():
+            q = search_q.strip().lower()
+            if q not in s["store"].lower() and q not in s["address"].lower():
+                continue
+        filtered_stops.append(s)
+
+    st.caption(f"Showing **{len(filtered_stops)}** of {len(route_stops)} locations")
+
+    default_note = "Run amber strobes; follow standard overnight noise courtesy. Report discrepancies or issues to Lone Wolf."
+
+    for s in filtered_stops:
+        sched_label = ", ".join(s["days"]) if s["days"] else f"Flexible ({s['flex']})"
+        nightly_text = site_notes.get(s["id"], default_note)
+        with st.expander(f"**{s['store']}** ({s['line']}) — {sched_label}"):
+            st.markdown(f"📍 **Address:** `{s['address']}`")
+            st.markdown(f"📅 **Schedule:** {sched_label}  |  **Flex Rule:** {s['flex']}")
+            st.markdown("🔐 **Gate / Lot Access:** Open")
+            st.markdown(f"🌙 **Nightly Notes:** {nightly_text}")
+
+    st.divider()
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_dir", use_container_width=True):
+        navigate_to("hub")
+
+
+# ==============================================================================
+# ROUTER
+# ==============================================================================
+if st.session_state.current_page == "welcome" or st.session_state.selected_region is None:
+    render_welcome_page()
+elif st.session_state.current_page == "hub":
+    render_hub_page()
+elif st.session_state.current_page == "visit_log":
+    render_visit_log_page()
+elif st.session_state.current_page == "route_optimizer":
+    render_route_optimizer_page()
+elif st.session_state.current_page == "insurance_upload":
+    render_insurance_upload_page()
+elif st.session_state.current_page == "hazard_report":
+    render_hazard_report_page()
+elif st.session_state.current_page == "maintenance_log":
+    render_maintenance_log_page()
+elif st.session_state.current_page == "site_directory":
+    render_site_directory_page()
