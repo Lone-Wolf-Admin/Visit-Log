@@ -212,11 +212,11 @@ SPRINGS_ACCOUNTS = [
 ]
 
 SPRINGS_HOME_BASE = {
-    "name": "Home Base (Peyton)",
-    "short_label": "Peyton HQ",
-    "address": "10550 Stoneback Trl, Peyton, CO 80831",
-    "lat": 38.9836,
-    "lon": -104.5681,
+    "name": "Home Base (Calhan)",
+    "short_label": "Calhan HQ",
+    "address": "10485 McClelland Rd, Calhan, CO 80808",
+    "lat": 39.0358,
+    "lon": -104.3039,
 }
 
 SPRINGS_ROUTE_STOPS = [
@@ -833,7 +833,7 @@ def render_welcome_page():
 
     with st.container(border=True):
         st.subheader("🌲 Colorado Springs Operations")
-        st.caption("Colorado Springs, Fountain, Falcon, Peyton & Elizabeth routes.")
+        st.caption("Colorado Springs, Fountain, Falcon, Calhan & Elizabeth routes.")
         if st.button("Enter Colorado Springs Portal →", type="primary", use_container_width=True):
             select_region_and_go_hub("springs")
 
