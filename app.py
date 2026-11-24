@@ -21,7 +21,7 @@ VEHICLE_CHECKLIST_URL = (
     "viewform?usp=sharing&ouid=118278623880257833513"
 )
 
-# Mobile-first CSS: clears the top Streamlit banner, keeps the 7-column calendar grid on 1 row, and styles buttons
+# Mobile-first CSS: clears top Streamlit banner, keeps 7-column calendar grid on 1 row, and styles buttons
 st.markdown(
     """
     <style>
@@ -72,59 +72,71 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Master rate card (40 items grouped by Account -> Location -> Service, with street fragments for DMG Pro matching)
-RATE_CARD = [
-    {"id": "bb_mex_swp", "account": "Best Buy", "location": "Mexico", "service": "Sweeping", "rate": 30.00, "addr_keys": ["4100 e mexico"]},
-    {"id": "bb_mex_qc", "account": "Best Buy", "location": "Mexico", "service": "QC", "rate": 7.00, "addr_keys": ["4100 e mexico"]},
-    {"id": "bb_wad_swp", "account": "Best Buy", "location": "Wadsworth", "service": "Sweeping", "rate": 30.00, "addr_keys": ["5395 s wadsworth"]},
-    {"id": "bb_wad_qc", "account": "Best Buy", "location": "Wadsworth", "service": "QC", "rate": 7.00, "addr_keys": ["5395 s wadsworth"]},
-    {"id": "hr_prt", "account": "Highlands Ranch / Safeway", "location": "Highlands Ranch", "service": "Porter", "rate": 50.00, "addr_keys": ["9255 s broadway"]},
-    {"id": "hr_saf_swp", "account": "Highlands Ranch / Safeway", "location": "Highlands Ranch Safeway", "service": "Sweeping", "rate": 50.00, "addr_keys": ["9255 s broadway"]},
-    {"id": "ks_ark_swp", "account": "King Soopers", "location": "Arkansas", "service": "Sweeping", "rate": 40.00, "addr_keys": ["4201 e arkansas"]},
-    {"id": "ks_ark_qc", "account": "King Soopers", "location": "Arkansas", "service": "QC", "rate": 7.00, "addr_keys": ["4201 e arkansas"]},
-    {"id": "ks_ark_blk", "account": "King Soopers", "location": "Arkansas", "service": "Bulk Trash", "rate": 500.00, "addr_keys": ["4201 e arkansas"]},
-    {"id": "ks_eva_swp", "account": "King Soopers", "location": "Evans", "service": "Sweeping", "rate": 40.00, "addr_keys": ["2727 w evans"]},
-    {"id": "ks_eva_qc", "account": "King Soopers", "location": "Evans", "service": "QC", "rate": 7.00, "addr_keys": ["2727 w evans"]},
-    {"id": "ks_fed_swp", "account": "King Soopers", "location": "Federal", "service": "Sweeping", "rate": 40.00, "addr_keys": ["5050 s federal"]},
-    {"id": "ks_fed_qc", "account": "King Soopers", "location": "Federal", "service": "QC", "rate": 7.00, "addr_keys": ["5050 s federal"]},
-    {"id": "ks_ham_qc", "account": "King Soopers", "location": "Hampden", "service": "QC", "rate": 5.00, "addr_keys": ["6470 e hampden"]},
-    {"id": "ks_lee_swp", "account": "King Soopers", "location": "Leetsdale", "service": "Sweeping", "rate": 40.00, "addr_keys": ["4600 leetsdale"]},
-    {"id": "ks_lee_qc", "account": "King Soopers", "location": "Leetsdale", "service": "QC", "rate": 7.00, "addr_keys": ["4600 leetsdale"]},
-    {"id": "ks_lit_qc", "account": "King Soopers", "location": "Littleton", "service": "QC", "rate": 5.00, "addr_keys": ["100 w littleton"]},
-    {"id": "ks_lit_prt", "account": "King Soopers", "location": "Littleton", "service": "Porter", "rate": 7.00, "addr_keys": ["100 w littleton"]},
-    {"id": "ks_qui_qc", "account": "King Soopers", "location": "Quincy", "service": "QC", "rate": 5.00, "addr_keys": ["19001 e quincy"]},
-    {"id": "ks_sho_prt", "account": "King Soopers", "location": "S Holly", "service": "Porter", "rate": 7.00, "addr_keys": ["6000 south holly", "6000 s holly"]},
-    {"id": "ko_20m_swp", "account": "Kohl's", "location": "20 Mile", "service": "Sweeping", "rate": 35.00, "addr_keys": ["11485 s twenty mile"]},
-    {"id": "ko_20m_qc", "account": "Kohl's", "location": "20 Mile", "service": "QC", "rate": 7.00, "addr_keys": ["11485 s twenty mile"]},
-    {"id": "ko_cas_swp", "account": "Kohl's", "location": "Castle Rock", "service": "Sweeping", "rate": 35.00, "addr_keys": ["4800 milestone"]},
-    {"id": "ko_cas_qc", "account": "Kohl's", "location": "Castle Rock", "service": "QC", "rate": 7.00, "addr_keys": ["4800 milestone"]},
-    {"id": "ko_kip_swp", "account": "Kohl's", "location": "Kipling", "service": "Sweeping", "rate": 35.00, "addr_keys": ["8444 s kipling"]},
-    {"id": "ko_kip_qc", "account": "Kohl's", "location": "Kipling", "service": "QC", "rate": 7.00, "addr_keys": ["8444 s kipling"]},
-    {"id": "ko_que_swp", "account": "Kohl's", "location": "Quebec", "service": "Sweeping", "rate": 35.00, "addr_keys": ["8660 s quebec"]},
-    {"id": "ko_que_qc", "account": "Kohl's", "location": "Quebec", "service": "QC", "rate": 7.00, "addr_keys": ["8660 s quebec"]},
-    {"id": "ko_bus_trh", "account": "Kohl's", "location": "All Kohl's", "service": "Bus Trash", "rate": 15.00, "addr_keys": ["kohl"]},
-    {"id": "lo_20m_swp", "account": "Lowe's", "location": "20 Mile", "service": "Sweeping", "rate": 50.00, "addr_keys": ["10000 s twenty mile"]},
-    {"id": "lo_buc_swp", "account": "Lowe's", "location": "Buckley", "service": "Sweeping", "rate": 50.00, "addr_keys": ["4455 south buckley", "4455 s buckley"]},
-    {"id": "lo_pea_swp", "account": "Lowe's", "location": "Peakview", "service": "Sweeping", "rate": 50.00, "addr_keys": ["9100 east peakview", "9100 e peakview"]},
-    {"id": "lo_san_swp", "account": "Lowe's", "location": "Santa Fe", "service": "Sweeping", "rate": 50.00, "addr_keys": ["5095 s santa fe"]},
-    {"id": "lo_whe_swp", "account": "Lowe's", "location": "Wheatlands", "service": "Sweeping", "rate": 50.00, "addr_keys": ["24505 e wheatlands"]},
-    {"id": "sc_wad_swp", "account": "Sam's Club", "location": "Wadsworth", "service": "Sweeping", "rate": 50.00, "addr_keys": ["4827 s wadsworth"]},
-    {"id": "wg_ara_swp", "account": "Walgreens", "location": "Arapahoe", "service": "Sweeping", "rate": 25.00, "addr_keys": ["16440 e arapahoe"]},
-    {"id": "wg_bel_swp", "account": "Walgreens", "location": "Belleview", "service": "Sweeping", "rate": 25.00, "addr_keys": ["2697 w belleview"]},
-    {"id": "wg_hgr_swp", "account": "Walgreens", "location": "Highlands Ranch", "service": "Sweeping", "rate": 25.00, "addr_keys": ["9390 s colorado"]},
-    {"id": "wg_hgr_qc", "account": "Walgreens", "location": "Highlands Ranch", "service": "QC", "rate": 7.00, "addr_keys": ["9390 s colorado"]},
-    {"id": "wg_kip_swp", "account": "Walgreens", "location": "Kipling", "service": "Sweeping", "rate": 25.00, "addr_keys": ["5870 s kipling"]},
+# ==============================================================================
+# DENVER DATA
+# ==============================================================================
+DENVER_RATE_CARD = [
+    {"id": "bb_mex_swp", "account": "Best Buy", "location": "Mexico", "service": "Sweeping", "rate": 30.00},
+    {"id": "bb_mex_qc", "account": "Best Buy", "location": "Mexico", "service": "QC", "rate": 7.00},
+    {"id": "bb_wad_swp", "account": "Best Buy", "location": "Wadsworth", "service": "Sweeping", "rate": 30.00},
+    {"id": "bb_wad_qc", "account": "Best Buy", "location": "Wadsworth", "service": "QC", "rate": 7.00},
+    {"id": "hr_prt", "account": "Highlands Ranch / Safeway", "location": "Highlands Ranch", "service": "Porter", "rate": 50.00},
+    {"id": "hr_saf_swp", "account": "Highlands Ranch / Safeway", "location": "Highlands Ranch Safeway", "service": "Sweeping", "rate": 50.00},
+    {"id": "ks_ark_swp", "account": "King Soopers", "location": "Arkansas", "service": "Sweeping", "rate": 40.00},
+    {"id": "ks_ark_qc", "account": "King Soopers", "location": "Arkansas", "service": "QC", "rate": 7.00},
+    {"id": "ks_ark_blk", "account": "King Soopers", "location": "Arkansas", "service": "Bulk Trash", "rate": 500.00},
+    {"id": "ks_eva_swp", "account": "King Soopers", "location": "Evans", "service": "Sweeping", "rate": 40.00},
+    {"id": "ks_eva_qc", "account": "King Soopers", "location": "Evans", "service": "QC", "rate": 7.00},
+    {"id": "ks_fed_swp", "account": "King Soopers", "location": "Federal", "service": "Sweeping", "rate": 40.00},
+    {"id": "ks_fed_qc", "account": "King Soopers", "location": "Federal", "service": "QC", "rate": 7.00},
+    {"id": "ks_ham_qc", "account": "King Soopers", "location": "Hampden", "service": "QC", "rate": 5.00},
+    {"id": "ks_lee_swp", "account": "King Soopers", "location": "Leetsdale", "service": "Sweeping", "rate": 40.00},
+    {"id": "ks_lee_qc", "account": "King Soopers", "location": "Leetsdale", "service": "QC", "rate": 7.00},
+    {"id": "ks_lit_qc", "account": "King Soopers", "location": "Littleton", "service": "QC", "rate": 5.00},
+    {"id": "ks_lit_prt", "account": "King Soopers", "location": "Littleton", "service": "Porter", "rate": 7.00},
+    {"id": "ks_qui_qc", "account": "King Soopers", "location": "Quincy", "service": "QC", "rate": 5.00},
+    {"id": "ks_sho_prt", "account": "King Soopers", "location": "S Holly", "service": "Porter", "rate": 7.00},
+    {"id": "ko_20m_swp", "account": "Kohl's", "location": "20 Mile", "service": "Sweeping", "rate": 35.00},
+    {"id": "ko_20m_qc", "account": "Kohl's", "location": "20 Mile", "service": "QC", "rate": 7.00},
+    {"id": "ko_cas_swp", "account": "Kohl's", "location": "Castle Rock", "service": "Sweeping", "rate": 35.00},
+    {"id": "ko_cas_qc", "account": "Kohl's", "location": "Castle Rock", "service": "QC", "rate": 7.00},
+    {"id": "ko_kip_swp", "account": "Kohl's", "location": "Kipling", "service": "Sweeping", "rate": 35.00},
+    {"id": "ko_kip_qc", "account": "Kohl's", "location": "Kipling", "service": "QC", "rate": 7.00},
+    {"id": "ko_que_swp", "account": "Kohl's", "location": "Quebec", "service": "Sweeping", "rate": 35.00},
+    {"id": "ko_que_qc", "account": "Kohl's", "location": "Quebec", "service": "QC", "rate": 7.00},
+    {"id": "ko_bus_trh", "account": "Kohl's", "location": "All Kohl's", "service": "Bus Trash", "rate": 15.00},
+    {"id": "lo_20m_swp", "account": "Lowe's", "location": "20 Mile", "service": "Sweeping", "rate": 50.00},
+    {"id": "lo_buc_swp", "account": "Lowe's", "location": "Buckley", "service": "Sweeping", "rate": 50.00},
+    {"id": "lo_pea_swp", "account": "Lowe's", "location": "Peakview", "service": "Sweeping", "rate": 50.00},
+    {"id": "lo_san_swp", "account": "Lowe's", "location": "Santa Fe", "service": "Sweeping", "rate": 50.00},
+    {"id": "lo_whe_swp", "account": "Lowe's", "location": "Wheatlands", "service": "Sweeping", "rate": 50.00},
+    {"id": "sc_wad_swp", "account": "Sam's Club", "location": "Wadsworth", "service": "Sweeping", "rate": 50.00},
+    {"id": "wg_ara_swp", "account": "Walgreens", "location": "Arapahoe", "service": "Sweeping", "rate": 25.00},
+    {"id": "wg_bel_swp", "account": "Walgreens", "location": "Belleview", "service": "Sweeping", "rate": 25.00},
+    {"id": "wg_hgr_swp", "account": "Walgreens", "location": "Highlands Ranch", "service": "Sweeping", "rate": 25.00},
+    {"id": "wg_hgr_qc", "account": "Walgreens", "location": "Highlands Ranch", "service": "QC", "rate": 7.00},
+    {"id": "wg_kip_swp", "account": "Walgreens", "location": "Kipling", "service": "Sweeping", "rate": 25.00},
 ]
 
-# Denver Route Stops
-HOME_BASE = {
+DENVER_ACCOUNTS = [
+    "King Soopers",
+    "Lowe's",
+    "Kohl's",
+    "Best Buy",
+    "Highlands Ranch / Safeway",
+    "Sam's Club",
+    "Walgreens",
+]
+
+DENVER_HOME_BASE = {
     "name": "Home Base (Lakewood)",
+    "short_label": "Lakewood HQ",
     "address": "2345 Allison St, Lakewood, CO 80214",
     "lat": 39.7517,
     "lon": -105.0861,
 }
 
-ROUTE_STOPS = [
+DENVER_ROUTE_STOPS = [
     {"id": "r_hr_saf", "store": "Highlands Ranch Safeway", "address": "9255 S Broadway, Highlands Ranch, CO 80129", "line": "Dual", "flex": "NO", "days": ["Mon", "Wed", "Fri"], "lat": 39.5481, "lon": -104.9877},
     {"id": "r_ks_ham", "store": "King Soopers - Hampden", "address": "6470 E Hampden Ave, Denver, CO 80222", "line": "Dual", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6534, "lon": -104.9126},
     {"id": "r_ks_eva", "store": "King Soopers - Evans", "address": "2727 W Evans Ave, Denver, CO 80219", "line": "Sweep", "flex": "NO", "days": ["Mon", "Tue", "Wed", "Thu", "Fri"], "lat": 39.6787, "lon": -105.0216},
@@ -152,57 +164,154 @@ ROUTE_STOPS = [
     {"id": "r_lo_whe", "store": "Lowe's - Wheatlands (Mon + 1 Flex)", "address": "24505 E Wheatlands Pkwy, Aurora, CO 80016", "line": "Sweep", "flex": "Mon + Wed-Fri", "days": ["Mon"], "lat": 39.5919, "lon": -104.7024},
 ]
 
-# Site Directory Notes
-EMERGENCY_CONTACTS = [
-    {"role": "DMG Pro Support (Work Orders)", "contact": "Log check-in/out inside DMG Pro app before leaving lot"},
-    {"role": "Non-Emergency Police (Denver Metro)", "contact": "Denver: (720) 913-2000 | Aurora: (303) 627-3100 | Arapahoe/Douglas: (303) 795-4711"},
+DENVER_SITE_NOTES = {
+    "r_ks_ark": "Watch residential border on east side; keep blower idle down near homes. Report discrepancies or issues to Lone Wolf.",
+    "r_ks_lee": "High pedestrian/late-night traffic; run amber strobes. Report discrepancies or issues to Lone Wolf.",
+    "r_lo_pea": "Mandatory Monday + 1 Flex (Wed–Fri); check lumber aisle apron. Report discrepancies or issues to Lone Wolf.",
+    "r_lo_san": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
+    "r_lo_buc": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
+    "r_lo_20m": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
+    "r_lo_whe": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
+}
+
+# ==============================================================================
+# COLORADO SPRINGS DATA (NO PRICING SHOWN)
+# ==============================================================================
+SPRINGS_RATE_CARD = [
+    {"id": "cs_wg_cir", "account": "Walgreens", "location": "N Circle Dr", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_dub", "account": "Walgreens", "location": "Dublin Blvd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_nev", "account": "Walgreens", "location": "N Nevada Ave", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_aca", "account": "Walgreens", "location": "N Academy Blvd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_bar", "account": "Walgreens", "location": "Barnes Rd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_fnt", "account": "Walgreens", "location": "Fountain Mesa Rd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_wg_stg", "account": "Walgreens", "location": "Southgate Rd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_lo_ncp", "account": "Lowe's", "location": "New Center Point (KBS)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_lo_nev", "account": "Lowe's", "location": "N Nevada Ave (KBS)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_lo_roy", "account": "Lowe's", "location": "Royal Pine Dr (KBS)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_lo_fnt", "account": "Lowe's", "location": "Fountain Mesa Rd (DMG)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_ks_ng_swp", "account": "King Soopers", "location": "North Gate Blvd (#620-00151)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_ks_ng_prt", "account": "King Soopers", "location": "North Gate Blvd (#620-00151)", "service": "Porter", "rate": 0.0},
+    {"id": "cs_ks_fnt_swp", "account": "King Soopers", "location": "Fountain (Sawcut Pt)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_br_fal", "account": "Big R", "location": "Falcon (US-24)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_br_eli", "account": "Big R", "location": "Elizabeth (Beverly St)", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_sw_eli", "account": "Elizabeth Safeway", "location": "S Elizabeth St", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_bo_fal", "account": "Falcon Big O Tires", "location": "Old Meridian Rd", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_rg_blv", "account": "Ridgeline B Shops", "location": "Ridgeline Dr Ste 110", "service": "Sweeping", "rate": 0.0},
+    {"id": "cs_or_off", "account": "Oracle Blvd Office Units", "location": "Oracle Blvd", "service": "Sweeping", "rate": 0.0},
 ]
 
-SITE_NOTES = {
-    "r_ks_ark": {
-        "curfew": "Watch residential border on east side; keep blower idle down near homes. Report discrepancies or issues to Lone Wolf.",
+SPRINGS_ACCOUNTS = [
+    "King Soopers",
+    "Lowe's",
+    "Walgreens",
+    "Big R",
+    "Elizabeth Safeway",
+    "Falcon Big O Tires",
+    "Ridgeline B Shops",
+    "Oracle Blvd Office Units",
+]
+
+SPRINGS_HOME_BASE = {
+    "name": "Home Base (Peyton)",
+    "short_label": "Peyton HQ",
+    "address": "10550 Stoneback Trl, Peyton, CO 80831",
+    "lat": 38.9836,
+    "lon": -104.5681,
+}
+
+SPRINGS_ROUTE_STOPS = [
+    {"id": "csr_ks_ng", "store": "King Soopers #620-00151 - North Gate", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921", "line": "Dual", "flex": "Sun/Mon & Wed/Thu", "days": ["Sun", "Mon", "Wed", "Thu"], "lat": 39.0268, "lon": -104.8152},
+    {"id": "csr_ks_fnt", "store": "Fountain King Soopers", "address": "6255 Sawcut Pt, Fountain, CO 80817", "line": "Sweep", "flex": "Sun/Mon & Wed/Thu", "days": ["Sun", "Mon", "Wed", "Thu"], "lat": 38.7369, "lon": -104.7145},
+    {"id": "csr_lo_ncp", "store": "Lowe's (KBS) - New Center Point", "address": "2945 New Center Point, Colorado Springs, CO 80922", "line": "Sweep", "flex": "Sunday or Monday", "days": ["Sun", "Mon"], "lat": 38.8758, "lon": -104.7176},
+    {"id": "csr_lo_nev", "store": "Lowe's (KBS) - N Nevada", "address": "4880 N Nevada Ave, Colorado Springs, CO 80918", "line": "Sweep", "flex": "Sunday or Monday", "days": ["Sun", "Mon"], "lat": 38.9022, "lon": -104.8165},
+    {"id": "csr_lo_roy", "store": "Lowe's (KBS) - Royal Pine", "address": "4252 Royal Pine Dr, Colorado Springs, CO 80920", "line": "Sweep", "flex": "Sunday or Monday", "days": ["Sun", "Mon"], "lat": 38.9652, "lon": -104.7495},
+    {"id": "csr_lo_fnt", "store": "Lowe's (DMG) - Fountain Mesa", "address": "7710 Fountain Mesa Rd, Fountain, CO 80817", "line": "Sweep", "flex": "Sun/Mon & Wed/Thu", "days": ["Sun", "Mon", "Wed", "Thu"], "lat": 38.7163, "lon": -104.6974},
+    {"id": "csr_wg_nev", "store": "Walgreens - N Nevada", "address": "2921 N Nevada Ave, Colorado Springs, CO 80907", "line": "Sweep", "flex": "Sun/Mon (Flexible)", "days": ["Sun", "Mon"], "lat": 38.8732, "lon": -104.8211},
+    {"id": "csr_wg_cir", "store": "Walgreens - N Circle", "address": "920 N Circle Dr, Colorado Springs, CO 80909", "line": "Sweep", "flex": "Sun/Mon (Flexible)", "days": ["Sun", "Mon"], "lat": 38.8473, "lon": -104.7766},
+    {"id": "csr_wg_dub", "store": "Walgreens - Dublin", "address": "2785 Dublin Blvd, Colorado Springs, CO 80918", "line": "Sweep", "flex": "Wed/Thu (Flexible)", "days": ["Wed", "Thu"], "lat": 38.9261, "lon": -104.7755},
+    {"id": "csr_wg_aca", "store": "Walgreens - N Academy", "address": "3480 N Academy Blvd, Colorado Springs, CO 80917", "line": "Sweep", "flex": "Wed/Thu (Flexible)", "days": ["Wed", "Thu"], "lat": 38.8825, "lon": -104.7568},
+    {"id": "csr_wg_bar", "store": "Walgreens - Barnes", "address": "6075 Barnes Rd, Colorado Springs, CO 80922", "line": "Sweep", "flex": "Wed/Thu (Flexible)", "days": ["Wed", "Thu"], "lat": 38.8955, "lon": -104.7145},
+    {"id": "csr_wg_fnt", "store": "Walgreens - Fountain Mesa", "address": "7910 Fountain Mesa Rd, Fountain, CO 80817", "line": "Sweep", "flex": "Wed/Thu (Flexible)", "days": ["Wed", "Thu"], "lat": 38.7135, "lon": -104.6975},
+    {"id": "csr_wg_stg", "store": "Walgreens - Southgate", "address": "1855 Southgate Rd, Colorado Springs, CO 80906", "line": "Sweep", "flex": "Yes", "days": [], "lat": 38.8075, "lon": -104.8235},
+    {"id": "csr_br_eli", "store": "Big R - Elizabeth", "address": "650 Beverly St, Elizabeth, CO 80107", "line": "Sweep", "flex": "Tue or Fri", "days": ["Tue", "Fri"], "lat": 39.3614, "lon": -104.6022},
+    {"id": "csr_sw_eli", "store": "Elizabeth Safeway", "address": "220 S Elizabeth St, Elizabeth, CO 80107", "line": "Sweep", "flex": "Tue or Fri", "days": ["Tue", "Fri"], "lat": 39.3585, "lon": -104.5978},
+    {"id": "csr_bo_fal", "store": "Falcon Big O Tires", "address": "6985 Old Meridian Rd, Falcon, CO 80831", "line": "Sweep", "flex": "Yes", "days": [], "lat": 38.9408, "lon": -104.6075},
+    {"id": "csr_br_fal", "store": "Big R - Falcon", "address": "14155 US-24, Falcon, CO 80831", "line": "Sweep", "flex": "Yes", "days": [], "lat": 38.9482, "lon": -104.5885},
+    {"id": "csr_rg_blv", "store": "Ridgeline B Shops", "address": "11550 Ridgeline Dr Ste 110, Colorado Springs, CO 80921", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.0025, "lon": -104.8055},
+    {"id": "csr_or_off", "store": "Oracle Blvd Office Units", "address": "12265 Oracle Blvd, Colorado Springs, CO 80921", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.0112, "lon": -104.8015},
+]
+
+SPRINGS_SITE_NOTES = {
+    "csr_ks_ng": "Both Porter and Sweeping services apply at North Gate. Report discrepancies or issues to Lone Wolf.",
+    "csr_lo_ncp": "Service window: Sunday or Monday (KBS). Check lumber apron and rear dock. Report discrepancies or issues to Lone Wolf.",
+    "csr_lo_nev": "Service window: Sunday or Monday (KBS). Check lumber apron and rear dock. Report discrepancies or issues to Lone Wolf.",
+    "csr_lo_roy": "Service window: Sunday or Monday (KBS). Check lumber apron and rear dock. Report discrepancies or issues to Lone Wolf.",
+    "csr_lo_fnt": "Service window: Sun/Mon and Wed/Thu (DMG). Check lumber apron and rear dock. Report discrepancies or issues to Lone Wolf.",
+    "csr_br_eli": "Service window: Tuesday or Friday. Watch perimeter fence for windblown debris. Report discrepancies or issues to Lone Wolf.",
+    "csr_sw_eli": "Service window: Tuesday or Friday. Run amber strobes; follow overnight noise courtesy. Report discrepancies or issues to Lone Wolf.",
+}
+
+REGION_CONFIG = {
+    "denver": {
+        "name": "Denver",
+        "icon": "🏔️",
+        "show_pricing": True,
+        "rate_card": DENVER_RATE_CARD,
+        "accounts": DENVER_ACCOUNTS,
+        "home_base": DENVER_HOME_BASE,
+        "route_stops": DENVER_ROUTE_STOPS,
+        "site_notes": DENVER_SITE_NOTES,
+        "police_contact": "Denver: (720) 913-2000 | Aurora: (303) 627-3100 | Arapahoe/Douglas: (303) 795-4711",
     },
-    "r_ks_lee": {
-        "curfew": "High pedestrian/late-night traffic; run amber strobes. Report discrepancies or issues to Lone Wolf.",
-    },
-    "r_lo_pea": {
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri); check lumber aisle apron. Report discrepancies or issues to Lone Wolf.",
-    },
-    "r_lo_san": {
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
-    },
-    "r_lo_buc": {
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
-    },
-    "r_lo_20m": {
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
-    },
-    "r_lo_whe": {
-        "curfew": "Mandatory Monday + 1 Flex (Wed–Fri). Report discrepancies or issues to Lone Wolf.",
+    "springs": {
+        "name": "Colorado Springs",
+        "icon": "🌲",
+        "show_pricing": False,
+        "rate_card": SPRINGS_RATE_CARD,
+        "accounts": SPRINGS_ACCOUNTS,
+        "home_base": SPRINGS_HOME_BASE,
+        "route_stops": SPRINGS_ROUTE_STOPS,
+        "site_notes": SPRINGS_SITE_NOTES,
+        "police_contact": "Colorado Springs: (719) 444-7000 | Fountain: (719) 382-8555 | El Paso County: (719) 390-5555",
     },
 }
 
 # --- SESSION STATE INITIALIZATION ---
+if "selected_region" not in st.session_state:
+    st.session_state.selected_region = None
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "home"
+    st.session_state.current_page = "welcome"
 if "confirm_leave_log" not in st.session_state:
     st.session_state.confirm_leave_log = False
-if "log_submitted" not in st.session_state:
-    st.session_state.log_submitted = False
 
-if "visits" not in st.session_state or not isinstance(st.session_state.visits, dict):
-    st.session_state.visits = {}
-for row in RATE_CARD:
-    st.session_state.visits.setdefault(row["id"], [])
+for reg_key, reg_data in REGION_CONFIG.items():
+    v_key = f"visits_{reg_key}"
+    if v_key not in st.session_state or not isinstance(st.session_state[v_key], dict):
+        st.session_state[v_key] = {}
+    for row in reg_data["rate_card"]:
+        st.session_state[v_key].setdefault(row["id"], [])
+    st.session_state.setdefault(f"extra_items_{reg_key}", [])
+    st.session_state.setdefault(f"extra_temp_days_{reg_key}", [])
+    st.session_state.setdefault(f"log_submitted_{reg_key}", False)
 
 if "open_account" not in st.session_state:
     st.session_state.open_account = None
 if "open_calendar" not in st.session_state:
     st.session_state.open_calendar = None
-if "extra_items" not in st.session_state:
-    st.session_state.extra_items = []
-if "extra_temp_days" not in st.session_state:
-    st.session_state.extra_temp_days = []
+
+
+def get_active_region() -> tuple[str, dict]:
+    reg_key = st.session_state.selected_region or "denver"
+    return reg_key, REGION_CONFIG[reg_key]
+
+
+def select_region_and_go_hub(reg_key: str):
+    st.session_state.selected_region = reg_key
+    st.session_state.current_page = "hub"
+    st.session_state.open_account = None
+    st.session_state.open_calendar = None
+    st.session_state.confirm_leave_log = False
+    st.rerun()
 
 
 def navigate_to(page_name: str):
@@ -211,14 +320,15 @@ def navigate_to(page_name: str):
     st.rerun()
 
 
-def reset_visit_log_data():
-    for row in RATE_CARD:
-        st.session_state.visits[row["id"]] = []
-    st.session_state.extra_items = []
-    st.session_state.extra_temp_days = []
+def reset_visit_log_data(reg_key: str):
+    reg_data = REGION_CONFIG[reg_key]
+    for row in reg_data["rate_card"]:
+        st.session_state[f"visits_{reg_key}"][row["id"]] = []
+    st.session_state[f"extra_items_{reg_key}"] = []
+    st.session_state[f"extra_temp_days_{reg_key}"] = []
     st.session_state.open_account = None
     st.session_state.open_calendar = None
-    st.session_state.log_submitted = False
+    st.session_state[f"log_submitted_{reg_key}"] = False
     st.session_state.confirm_leave_log = False
 
 
@@ -255,10 +365,14 @@ def render_calendar_picker(selected_days: list[int], year: int, month_num: int, 
     return sorted(updated)
 
 
-def build_summary_df() -> pd.DataFrame:
+def build_summary_df(reg_key: str) -> pd.DataFrame:
+    reg_data = REGION_CONFIG[reg_key]
+    visits_dict = st.session_state[f"visits_{reg_key}"]
+    extra_list = st.session_state[f"extra_items_{reg_key}"]
+
     rows = []
-    for item in RATE_CARD:
-        days = sorted(st.session_state.visits.get(item["id"], []))
+    for item in reg_data["rate_card"]:
+        days = sorted(visits_dict.get(item["id"], []))
         qty = len(days)
         rows.append(
             {
@@ -271,7 +385,7 @@ def build_summary_df() -> pd.DataFrame:
                 "Dates Visited": ", ".join(str(d) for d in days),
             }
         )
-    for extra in st.session_state.extra_items:
+    for extra in extra_list:
         days = sorted(extra.get("days", []))
         qty = len(days)
         rows.append(
@@ -280,15 +394,22 @@ def build_summary_df() -> pd.DataFrame:
                 "Store": extra["name"],
                 "Line Item": extra["name"],
                 "Visits": qty,
-                "Rate": extra["rate"],
-                "Amount": round(qty * extra["rate"], 2),
+                "Rate": extra.get("rate", 0.0),
+                "Amount": round(qty * extra.get("rate", 0.0), 2),
                 "Dates Visited": ", ".join(str(d) for d in days),
             }
         )
     return pd.DataFrame(rows)
 
 
-def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str, tech_name: str = "") -> bytes:
+def generate_invoice_pdf(
+    df: pd.DataFrame,
+    billing_month: str,
+    invoice_num: str,
+    region_name: str,
+    show_pricing: bool = True,
+    tech_name: str = "",
+) -> bytes:
     active_df = df[df["Visits"] > 0].copy()
     pdf = FPDF(orientation="P", unit="mm", format="Letter")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -299,14 +420,16 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 14)
     pdf.set_xy(14, 14)
-    header_title = f"{tech_name.strip().upper()} - MONTHLY VISIT LOG" if tech_name.strip() else "MONTHLY VISIT LOG"
-    pdf.cell(135, 7, header_title[:42])
+    base_title = f"{region_name.upper()} - MONTHLY VISIT LOG"
+    header_title = f"{tech_name.strip().upper()} - {base_title}" if tech_name.strip() else base_title
+    pdf.cell(145, 7, header_title[:46])
     pdf.set_font("Helvetica", "", 10)
     pdf.set_xy(14, 22)
-    pdf.cell(135, 6, f"Bill To: Lone Wolf Parking Lot Services LLC  |  Period: {billing_month}")
-    pdf.set_xy(150, 16)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(50, 8, f"Invoice #{invoice_num}", align="R")
+    pdf.cell(145, 6, f"Bill To: Lone Wolf Parking Lot Services LLC  |  Period: {billing_month}")
+    if show_pricing:
+        pdf.set_xy(155, 16)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(45, 8, f"Invoice #{invoice_num}", align="R")
 
     total_visits = int(active_df["Visits"].sum()) if not active_df.empty else 0
     total_amount = float(active_df["Amount"].sum()) if not active_df.empty else 0.0
@@ -314,47 +437,78 @@ def generate_invoice_pdf(df: pd.DataFrame, billing_month: str, invoice_num: str,
     pdf.set_text_color(15, 23, 42)
     pdf.set_xy(10, 36)
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(98, 8, f"Total Verified Visits: {total_visits}", border=1)
-    pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
+    if show_pricing:
+        pdf.cell(98, 8, f"Total Verified Visits: {total_visits}", border=1)
+        pdf.cell(98, 8, f"Total Invoice Amount: ${total_amount:,.2f}", border=1, align="R")
+    else:
+        pdf.cell(196, 8, f"Total Verified Visits ({region_name}): {total_visits}", border=1)
 
     pdf.set_xy(10, 48)
     pdf.set_fill_color(15, 76, 129)
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 9)
-    col_w = [68, 14, 20, 24, 70]
-    headers = ["Service Line Item", "Visits", "Rate", "Amount", "Days Visited"]
-    for w, h in zip(col_w, headers):
-        align = "R" if h in ("Visits", "Rate", "Amount") else "L"
-        pdf.cell(w, 8, h, border=1, fill=True, align=align)
-    pdf.ln()
 
-    pdf.set_text_color(15, 23, 42)
-    pdf.set_font("Helvetica", "", 8.5)
-    fill = False
-    for _, r in active_df.iterrows():
-        pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
-        dates_str = r["Dates Visited"] if len(r["Dates Visited"]) <= 44 else r["Dates Visited"][:41] + "..."
-        pdf.cell(col_w[0], 7, r["Line Item"][:38], border=1, fill=True)
-        pdf.cell(col_w[1], 7, str(int(r["Visits"])), border=1, fill=True, align="R")
-        pdf.cell(col_w[2], 7, f"${r['Rate']:,.2f}", border=1, fill=True, align="R")
-        pdf.cell(col_w[3], 7, f"${r['Amount']:,.2f}", border=1, fill=True, align="R")
-        pdf.cell(col_w[4], 7, dates_str, border=1, fill=True)
+    if show_pricing:
+        col_w = [68, 14, 20, 24, 70]
+        headers = ["Service Line Item", "Visits", "Rate", "Amount", "Days Visited"]
+        for w, h in zip(col_w, headers):
+            align = "R" if h in ("Visits", "Rate", "Amount") else "L"
+            pdf.cell(w, 8, h, border=1, fill=True, align=align)
         pdf.ln()
-        fill = not fill
 
-    pdf.set_fill_color(226, 232, 240)
-    pdf.set_font("Helvetica", "B", 9.5)
-    pdf.cell(col_w[0], 8, "TOTAL", border=1, fill=True, align="R")
-    pdf.cell(col_w[1], 8, str(total_visits), border=1, fill=True, align="R")
-    pdf.cell(col_w[2], 8, "", border=1, fill=True)
-    pdf.cell(col_w[3], 8, f"${total_amount:,.2f}", border=1, fill=True, align="R")
-    pdf.cell(col_w[4], 8, "Attach to Novo Invoice", border=1, fill=True)
+        pdf.set_text_color(15, 23, 42)
+        pdf.set_font("Helvetica", "", 8.5)
+        fill = False
+        for _, r in active_df.iterrows():
+            pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
+            dates_str = r["Dates Visited"] if len(r["Dates Visited"]) <= 44 else r["Dates Visited"][:41] + "..."
+            pdf.cell(col_w[0], 7, r["Line Item"][:38], border=1, fill=True)
+            pdf.cell(col_w[1], 7, str(int(r["Visits"])), border=1, fill=True, align="R")
+            pdf.cell(col_w[2], 7, f"${r['Rate']:,.2f}", border=1, fill=True, align="R")
+            pdf.cell(col_w[3], 7, f"${r['Amount']:,.2f}", border=1, fill=True, align="R")
+            pdf.cell(col_w[4], 7, dates_str, border=1, fill=True)
+            pdf.ln()
+            fill = not fill
+
+        pdf.set_fill_color(226, 232, 240)
+        pdf.set_font("Helvetica", "B", 9.5)
+        pdf.cell(col_w[0], 8, "TOTAL", border=1, fill=True, align="R")
+        pdf.cell(col_w[1], 8, str(total_visits), border=1, fill=True, align="R")
+        pdf.cell(col_w[2], 8, "", border=1, fill=True)
+        pdf.cell(col_w[3], 8, f"${total_amount:,.2f}", border=1, fill=True, align="R")
+        pdf.cell(col_w[4], 8, "Attach to Novo Invoice", border=1, fill=True)
+    else:
+        col_w = [92, 18, 86]
+        headers = ["Service Line Item", "Visits", "Days Visited"]
+        for w, h in zip(col_w, headers):
+            align = "R" if h == "Visits" else "L"
+            pdf.cell(w, 8, h, border=1, fill=True, align=align)
+        pdf.ln()
+
+        pdf.set_text_color(15, 23, 42)
+        pdf.set_font("Helvetica", "", 8.5)
+        fill = False
+        for _, r in active_df.iterrows():
+            pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
+            dates_str = r["Dates Visited"] if len(r["Dates Visited"]) <= 54 else r["Dates Visited"][:51] + "..."
+            pdf.cell(col_w[0], 7, r["Line Item"][:50], border=1, fill=True)
+            pdf.cell(col_w[1], 7, str(int(r["Visits"])), border=1, fill=True, align="R")
+            pdf.cell(col_w[2], 7, dates_str, border=1, fill=True)
+            pdf.ln()
+            fill = not fill
+
+        pdf.set_fill_color(226, 232, 240)
+        pdf.set_font("Helvetica", "B", 9.5)
+        pdf.cell(col_w[0], 8, "TOTAL VISITS", border=1, fill=True, align="R")
+        pdf.cell(col_w[1], 8, str(total_visits), border=1, fill=True, align="R")
+        pdf.cell(col_w[2], 8, f"{region_name} Verified Log", border=1, fill=True)
 
     return bytes(pdf.output())
 
 
 def generate_hazard_pdf(
     tech_name: str,
+    region_name: str,
     store_name: str,
     store_address: str,
     timestamp_str: str,
@@ -372,9 +526,9 @@ def generate_hazard_pdf(
     pdf.set_fill_color(153, 27, 27)
     pdf.rect(10, 10, 196, 22, "F")
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_font("Helvetica", "B", 13)
     pdf.set_xy(14, 14)
-    pdf.cell(188, 7, "LONE WOLF - LOT HAZARD & ACCESS EXCEPTION REPORT")
+    pdf.cell(188, 7, f"LONE WOLF ({region_name.upper()}) - LOT HAZARD & ACCESS REPORT")
     pdf.set_font("Helvetica", "", 10)
     pdf.set_xy(14, 22)
     pdf.cell(188, 6, f"Reported: {timestamp_str}  |  Tech: {tech_name.strip() or 'Field Tech'}")
@@ -435,6 +589,8 @@ def send_completion_email(
     invoice_num: str,
     total_visits: int,
     total_amount: float,
+    region_name: str,
+    show_pricing: bool = True,
     tech_name: str = "",
     tech_copy_email: str = "",
 ):
@@ -449,21 +605,36 @@ def send_completion_email(
         recipients.append(tech_copy_email.strip())
 
     sender_label = tech_name.strip() if tech_name.strip() else "Tech"
+    reg_slug = region_name.replace(" ", "_")
 
     msg = EmailMessage()
-    msg["Subject"] = f"Monthly Visit Log Ready ({sender_label}) — {billing_month} (Inv #{invoice_num} | ${total_amount:,.2f})"
+    if show_pricing:
+        msg["Subject"] = f"[{region_name}] Monthly Visit Log Ready ({sender_label}) — {billing_month} (Inv #{invoice_num} | ${total_amount:,.2f})"
+        msg.set_content(
+            f"Hi Team,\n\n"
+            f"{sender_label} has completed the {region_name} monthly visit log for {billing_month}.\n\n"
+            f"- Region: {region_name}\n"
+            f"- Tech / Vendor: {sender_label}\n"
+            f"- Invoice #: {invoice_num}\n"
+            f"- Total Verified Visits: {total_visits}\n"
+            f"- Total Invoice Amount: ${total_amount:,.2f}\n\n"
+            f"The clean PDF visit log is attached to this email for your records. Attach a copy to your invoice and bill the total as shown on this document. All payments require valid proof of service and may not be paid if proof is not rendered.\n"
+        )
+        filename = f"{reg_slug}_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+    else:
+        msg["Subject"] = f"[{region_name}] Monthly Visit Log Ready ({sender_label}) — {billing_month} ({total_visits} Visits)"
+        msg.set_content(
+            f"Hi Team,\n\n"
+            f"{sender_label} has completed the {region_name} monthly visit log for {billing_month}.\n\n"
+            f"- Region: {region_name}\n"
+            f"- Tech / Vendor: {sender_label}\n"
+            f"- Total Verified Visits: {total_visits}\n\n"
+            f"The clean PDF visit log is attached to this email for your records. All payments require valid proof of service and may not be paid if proof is not rendered.\n"
+        )
+        filename = f"{reg_slug}_Visit_Log_{billing_month.replace(' ', '_')}.pdf"
+
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
-    msg.set_content(
-        f"Hi Team,\n\n"
-        f"{sender_label} has completed the monthly visit log for {billing_month}.\n\n"
-        f"- Tech / Vendor: {sender_label}\n"
-        f"- Invoice #: {invoice_num}\n"
-        f"- Total Verified Visits: {total_visits}\n"
-        f"- Total Invoice Amount: ${total_amount:,.2f}\n\n"
-        f"The clean PDF visit log is attached to this email for your records, attach a copy to your invoice and bill the total as shown on this document. All payments require valid proof of service and may not be paid if proof is not rendered.\n"
-    )
-    filename = f"Monthly_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
     msg.add_attachment(pdf_bytes, maintype="application", subtype="pdf", filename=filename)
 
     with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
@@ -474,6 +645,7 @@ def send_completion_email(
 def send_insurance_email(
     pdf_bytes: bytes,
     pdf_filename: str,
+    region_name: str,
     tech_name: str,
     company_name: str,
     policy_type: str,
@@ -497,12 +669,13 @@ def send_insurance_email(
     entity_label = company_name.strip() if company_name.strip() else tech_name.strip()
 
     msg = EmailMessage()
-    msg["Subject"] = f"Insurance Policy / COI Uploaded — {entity_label} ({policy_type} | Exp: {expiration_date})"
+    msg["Subject"] = f"[{region_name}] Insurance Policy / COI Uploaded — {entity_label} ({policy_type} | Exp: {expiration_date})"
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
     msg.set_content(
         f"Hi Team,\n\n"
-        f"A new Insurance Policy / Certificate of Insurance (COI) has been submitted via the Lone Wolf Field Portal.\n\n"
+        f"A new Insurance Policy / Certificate of Insurance (COI) has been submitted via the Lone Wolf Field Portal ({region_name}).\n\n"
+        f"- Region: {region_name}\n"
         f"- Tech / Contact Name: {tech_name.strip()}\n"
         f"- Business / LLC Name: {company_name.strip() or 'N/A'}\n"
         f"- Policy Type: {policy_type}\n"
@@ -522,6 +695,7 @@ def send_insurance_email(
 
 def send_hazard_email(
     pdf_bytes: bytes,
+    region_name: str,
     tech_name: str,
     store_name: str,
     store_address: str,
@@ -539,12 +713,13 @@ def send_hazard_email(
     recipient = st.secrets["email"]["recipient_email"]
 
     msg = EmailMessage()
-    msg["Subject"] = f"LOT HAZARD / ACCESS REPORT — {store_name} ({severity})"
+    msg["Subject"] = f"[{region_name}] LOT HAZARD / ACCESS REPORT — {store_name} ({severity})"
     msg["From"] = sender
     msg["To"] = recipient
     msg.set_content(
         f"Hi Team,\n\n"
-        f"A Lot Hazard / Access Exception Report was submitted from the field.\n\n"
+        f"A Lot Hazard / Access Exception Report was submitted from the {region_name} field portal.\n\n"
+        f"- Region: {region_name}\n"
         f"- Tech: {tech_name.strip() or 'Field Tech'}\n"
         f"- Time: {timestamp_str}\n"
         f"- Store: {store_name}\n"
@@ -567,6 +742,7 @@ def send_hazard_email(
 
 
 def send_maintenance_email(
+    region_name: str,
     tech_name: str,
     unit_num: str,
     log_date: str,
@@ -587,12 +763,13 @@ def send_maintenance_email(
 
     summary_tag = ", ".join(log_types) if log_types else "Shift Log"
     msg = EmailMessage()
-    msg["Subject"] = f"Hopper / Maintenance Log — {unit_num} ({summary_tag} | {log_date})"
+    msg["Subject"] = f"[{region_name}] Hopper / Maintenance Log — {unit_num} ({summary_tag} | {log_date})"
     msg["From"] = sender
     msg["To"] = recipient
     msg.set_content(
         f"Hi Team,\n\n"
-        f"A new Hopper Dump & Maintenance Log has been submitted.\n\n"
+        f"A new Hopper Dump & Maintenance Log has been submitted ({region_name}).\n\n"
+        f"- Region: {region_name}\n"
         f"- Tech / Driver: {tech_name.strip()}\n"
         f"- Truck / Unit #: {unit_num.strip()}\n"
         f"- Date: {log_date}\n"
@@ -620,11 +797,11 @@ def send_maintenance_email(
         server.send_message(msg)
 
 
-def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> list[dict]:
-    """Orders selected stops starting from Home Base (Lakewood) using nearest-neighbor routing."""
+def order_stops_nearest_neighbor(stops: list[dict], home_base: dict) -> list[dict]:
+    """Orders selected stops starting from the region's Home Base using nearest-neighbor routing."""
     remaining = stops.copy()
     ordered = []
-    curr_lat, curr_lon = HOME_BASE["lat"], HOME_BASE["lon"]
+    curr_lat, curr_lon = home_base["lat"], home_base["lon"]
 
     while remaining:
         nearest = min(
@@ -639,33 +816,74 @@ def order_stops_nearest_neighbor(stops: list[dict], round_trip: bool = True) -> 
 
 
 # ==============================================================================
-# PAGE 1: LANDING / HUB PAGE
+# PAGE 0: LONE WOLF WELCOME / REGION SELECTOR
 # ==============================================================================
-def render_home_page():
+def render_welcome_page():
     st.title("🐺 Lone Wolf Field Portal")
-    st.caption("Select a tool below to get started.")
+    st.subheader("Welcome to Lone Wolf Parking Lot Services")
+    st.write("Select your service region below to open your field tools, route planner, and visit logs.")
 
-    summary_df = build_summary_df()
+    st.divider()
+
+    with st.container(border=True):
+        st.subheader("🏔️ Denver Metro Operations")
+        st.caption("Denver, Lakewood, Littleton, Aurora, Highlands Ranch, Parker & Castle Rock routes.")
+        if st.button("Enter Denver Portal →", type="primary", use_container_width=True):
+            select_region_and_go_hub("denver")
+
+    with st.container(border=True):
+        st.subheader("🌲 Colorado Springs Operations")
+        st.caption("Colorado Springs, Fountain, Falcon, Peyton & Elizabeth routes.")
+        if st.button("Enter Colorado Springs Portal →", type="primary", use_container_width=True):
+            select_region_and_go_hub("springs")
+
+
+# ==============================================================================
+# PAGE 1: REGIONAL HUB PAGE (DENVER OR COLORADO SPRINGS)
+# ==============================================================================
+def render_hub_page():
+    reg_key, reg_data = get_active_region()
+    show_pricing = reg_data["show_pricing"]
+
+    if st.button("← Switch Region (Denver / Colorado Springs)", key="switch_region_top"):
+        navigate_to("welcome")
+
+    st.title(f"🐺 Lone Wolf — {reg_data['name']}")
+    st.caption(f"{reg_data['icon']} {reg_data['name']} Field Portal — Select a tool below to get started.")
+
+    summary_df = build_summary_df(reg_key)
     active_visits = int(summary_df["Visits"].sum())
     active_amt = float(summary_df["Amount"].sum())
+    is_submitted = st.session_state[f"log_submitted_{reg_key}"]
 
     # Card 1: Monthly Visit Log
     with st.container(border=True):
         st.subheader("🧹 Monthly Visit Log")
-        st.write("Log store visits by calendar date, export your Novo-ready PDF, and email your completed report.")
-        if active_visits > 0 and not st.session_state.log_submitted:
-            st.warning(f"In-progress draft: **{active_visits} visits (${active_amt:,.2f})** not yet submitted.")
+        if show_pricing:
+            st.write("Log store visits by calendar date, export your Novo-ready PDF, and email your completed report.")
+        else:
+            st.write("Log store visits by calendar date, export your verified PDF visit log, and email your completed report.")
+
+        if active_visits > 0 and not is_submitted:
+            if show_pricing:
+                st.warning(f"In-progress draft: **{active_visits} visits (${active_amt:,.2f})** not yet submitted.")
+            else:
+                st.warning(f"In-progress draft: **{active_visits} visits** logged and not yet submitted.")
+
         if st.button("Open Monthly Visit Log →", type="primary", use_container_width=True):
             navigate_to("visit_log")
 
     # Card 2: Route Optimizer
     with st.container(border=True):
-        st.subheader("🗺️ Denver Route Optimizer")
-        st.write("Build your daily sweep & porter route from Lakewood HQ, copy the address list, and launch RouteXL.com.")
+        st.subheader(f"🗺️ {reg_data['name']} Route Optimizer")
+        st.write(
+            f"Build your daily sweep & porter route from {reg_data['home_base']['short_label']}, "
+            f"copy the address list, and launch RouteXL.com."
+        )
         if st.button("Open Route Optimizer →", type="primary", use_container_width=True):
             navigate_to("route_optimizer")
 
-    # Card 3: Vehicle & Equipment Checklist (Logs straight to existing Google Form)
+    # Card 3: Vehicle & Equipment Checklist
     with st.container(border=True):
         st.subheader("🚚 Vehicle & Equipment Checklist")
         st.write("Complete your pre-trip / post-trip vehicle & sweeper inspection and log it directly to the team sheet.")
@@ -706,29 +924,37 @@ def render_home_page():
 
 
 # ==============================================================================
-# PAGE 2: MONTHLY VISIT LOG (WITH UNSAVED DATA PROTECTION)
+# PAGE 2: MONTHLY VISIT LOG (DENVER WITH PRICING / SPRINGS WITHOUT PRICING)
 # ==============================================================================
 def render_visit_log_page():
-    summary_df = build_summary_df()
+    reg_key, reg_data = get_active_region()
+    show_pricing = reg_data["show_pricing"]
+    visits_dict = st.session_state[f"visits_{reg_key}"]
+    extra_list = st.session_state[f"extra_items_{reg_key}"]
+    extra_temp = st.session_state[f"extra_temp_days_{reg_key}"]
+    is_submitted = st.session_state[f"log_submitted_{reg_key}"]
+
+    summary_df = build_summary_df(reg_key)
     tot_visits = int(summary_df["Visits"].sum())
     tot_amt = float(summary_df["Amount"].sum())
-    has_unsaved = (tot_visits > 0) and (not st.session_state.log_submitted)
+    has_unsaved = (tot_visits > 0) and (not is_submitted)
 
-    nav_col1, _ = st.columns([1.4, 2.6])
+    nav_col1, _ = st.columns([1.6, 2.4])
     with nav_col1:
-        if st.button("← Back to Home", key="top_back_log", use_container_width=True):
+        if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_log", use_container_width=True):
             if has_unsaved:
                 st.session_state.confirm_leave_log = True
                 st.rerun()
             else:
-                navigate_to("home")
+                navigate_to("hub")
 
     if st.session_state.confirm_leave_log and has_unsaved:
         with st.container(border=True):
+            amt_text = f" (${tot_amt:,.2f})" if show_pricing else ""
             st.error(
                 f"⚠️ **Data Will Be Lost if Not Submitted!**  \n"
-                f"You currently have **{tot_visits} visit(s) (${tot_amt:,.2f})** entered that have not been emailed yet. "
-                f"Please scroll down and tap **Email Completed Log to Team** first, or confirm below if you want to discard and return Home."
+                f"You currently have **{tot_visits} visit(s){amt_text}** entered that have not been emailed yet. "
+                f"Please scroll down and tap **Email Completed Log to Team** first, or confirm below if you want to discard and return."
             )
             w_col1, w_col2 = st.columns(2)
             with w_col1:
@@ -736,11 +962,11 @@ def render_visit_log_page():
                     st.session_state.confirm_leave_log = False
                     st.rerun()
             with w_col2:
-                if st.button("Discard & Go Home", type="secondary", use_container_width=True):
-                    reset_visit_log_data()
-                    navigate_to("home")
+                if st.button("Discard & Go Back", type="secondary", use_container_width=True):
+                    reset_visit_log_data(reg_key)
+                    navigate_to("hub")
 
-    st.title("🧹 Monthly Visit Log")
+    st.title(f"🧹 {reg_data['name']} Monthly Visit Log")
     st.caption("Open a store group below, tap 'Tap to pick dates', select your days, then tap OK.")
 
     tech_name = st.text_input("Tech / Company Name (Optional)", value="", placeholder="Enter your name or company")
@@ -754,41 +980,44 @@ def render_visit_log_page():
         (prev_year, prev_month, f"{calendar.month_name[prev_month]} {prev_year}"),
     ]
 
-    col_p, col_i = st.columns([2.3, 1.3])
-    with col_p:
+    if show_pricing:
+        col_p, col_i = st.columns([2.3, 1.3])
+        with col_p:
+            selected_period = st.selectbox(
+                "Billing Period",
+                options=period_options,
+                format_func=lambda x: x[2],
+                index=0,
+            )
+        with col_i:
+            invoice_num = st.text_input("Invoice #", value="0026")
+        k1, k2 = st.columns(2)
+        k1.metric("Total Visits Logged", f"{tot_visits}")
+        k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
+    else:
         selected_period = st.selectbox(
-            "Billing Period",
+            "Service Period",
             options=period_options,
             format_func=lambda x: x[2],
             index=0,
         )
-    with col_i:
-        invoice_num = st.text_input("Invoice #", value="0026")
+        invoice_num = "CS-LOG"
+        st.metric("Total Visits Logged", f"{tot_visits}")
 
     selected_year, selected_month_num, billing_month = selected_period
-
-    k1, k2 = st.columns(2)
-    k1.metric("Total Visits Logged", f"{tot_visits}")
-    k2.metric("Total Invoice Amount", f"${tot_amt:,.2f}")
 
     st.divider()
 
     st.subheader("1. Select Dates Visited")
-    accounts = [
-        "King Soopers",
-        "Lowe's",
-        "Kohl's",
-        "Best Buy",
-        "Highlands Ranch / Safeway",
-        "Sam's Club",
-        "Walgreens",
-    ]
+    for acct in reg_data["accounts"]:
+        acct_items = [x for x in reg_data["rate_card"] if x["account"] == acct]
+        acct_visits = sum(len(visits_dict.get(x["id"], [])) for x in acct_items)
+        acct_dollars = sum(len(visits_dict.get(x["id"], [])) * x["rate"] for x in acct_items)
 
-    for acct in accounts:
-        acct_items = [x for x in RATE_CARD if x["account"] == acct]
-        acct_visits = sum(len(st.session_state.visits.get(x["id"], [])) for x in acct_items)
-        acct_dollars = sum(len(st.session_state.visits.get(x["id"], [])) * x["rate"] for x in acct_items)
-        badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if acct_visits > 0 else ""
+        if acct_visits > 0:
+            badge = f" — ✅ {acct_visits} visits (${acct_dollars:,.0f})" if show_pricing else f" — ✅ {acct_visits} visits"
+        else:
+            badge = ""
 
         is_acct_open = (st.session_state.open_account == acct) or any(
             st.session_state.open_calendar == x["id"] for x in acct_items
@@ -796,20 +1025,21 @@ def render_visit_log_page():
 
         with st.expander(f"{acct}{badge}", expanded=is_acct_open):
             for item in acct_items:
-                current_days = st.session_state.visits.get(item["id"], [])
+                current_days = visits_dict.get(item["id"], [])
                 is_cal_open = st.session_state.open_calendar == item["id"]
 
+                rate_suffix = f" (${item['rate']:.0f}/visit)" if show_pricing else ""
                 if current_days:
                     days_preview = ", ".join(str(d) for d in current_days)
                     st.markdown(
-                        f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)  \n"
+                        f"**{item['location']} — {item['service']}**{rate_suffix}  \n"
                         f"Selected ({len(current_days)}): `{days_preview}`"
                     )
                 else:
-                    st.markdown(f"**{item['location']} — {item['service']}** (${item['rate']:.0f}/visit)")
+                    st.markdown(f"**{item['location']} — {item['service']}**{rate_suffix}")
 
                 if not is_cal_open:
-                    if st.button("📅 Tap to pick dates", key=f"open_{item['id']}", use_container_width=True):
+                    if st.button("📅 Tap to pick dates", key=f"open_{reg_key}_{item['id']}", use_container_width=True):
                         st.session_state.open_account = acct
                         st.session_state.open_calendar = item["id"]
                         st.rerun()
@@ -819,94 +1049,115 @@ def render_visit_log_page():
                             selected_days=current_days,
                             year=selected_year,
                             month_num=selected_month_num,
-                            key_prefix=item["id"],
+                            key_prefix=f"{reg_key}_{item['id']}",
                         )
                         if new_days != current_days:
-                            st.session_state.visits[item["id"]] = new_days
-                            st.session_state.log_submitted = False
+                            st.session_state[f"visits_{reg_key}"][item["id"]] = new_days
+                            st.session_state[f"log_submitted_{reg_key}"] = False
                             st.rerun()
 
-                        if st.button("✅ OK", key=f"ok_{item['id']}", type="primary", use_container_width=True):
+                        if st.button("✅ OK", key=f"ok_{reg_key}_{item['id']}", type="primary", use_container_width=True):
                             st.session_state.open_account = acct
                             st.session_state.open_calendar = None
                             st.rerun()
 
                 st.markdown("<hr style='margin:0.5rem 0; border-color:#e2e8f0;'>", unsafe_allow_html=True)
 
-            if st.button(f"Done with {acct} ▲", key=f"done_{acct}", use_container_width=True):
+            if st.button(f"Done with {acct} ▲", key=f"done_{reg_key}_{acct}", use_container_width=True):
                 st.session_state.open_account = None
                 st.session_state.open_calendar = None
                 st.rerun()
 
+    # Optional One-Off / Bulk Trash section
     with st.expander(
         "➕ Add One-Off Job (e.g., Bulk Trash)",
         expanded=(st.session_state.open_account == "extra_job" or st.session_state.open_calendar == "extra_job"),
     ):
-        ex_name = st.text_input("Job Description", placeholder="e.g., Arkansas Bulk Trash")
-        ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
+        ex_name = st.text_input("Job Description", placeholder="e.g., Bulk Trash / Extra Sweep")
+        if show_pricing:
+            ex_rate = st.number_input("Price per Visit ($)", min_value=0.0, value=500.0, step=25.0)
+        else:
+            ex_rate = 0.0
 
-        if st.session_state.extra_temp_days:
-            st.caption(f"Selected days: {', '.join(str(d) for d in st.session_state.extra_temp_days)}")
+        if extra_temp:
+            st.caption(f"Selected days: {', '.join(str(d) for d in extra_temp)}")
 
         if st.session_state.open_calendar != "extra_job":
-            if st.button("📅 Tap to pick dates", key="open_extra_job", use_container_width=True):
+            if st.button("📅 Tap to pick dates", key=f"open_extra_{reg_key}", use_container_width=True):
                 st.session_state.open_account = "extra_job"
                 st.session_state.open_calendar = "extra_job"
                 st.rerun()
         else:
             with st.container(border=True):
                 new_ex_days = render_calendar_picker(
-                    selected_days=st.session_state.extra_temp_days,
+                    selected_days=extra_temp,
                     year=selected_year,
                     month_num=selected_month_num,
-                    key_prefix="extra_job",
+                    key_prefix=f"extra_{reg_key}",
                 )
-                if new_ex_days != st.session_state.extra_temp_days:
-                    st.session_state.extra_temp_days = new_ex_days
+                if new_ex_days != extra_temp:
+                    st.session_state[f"extra_temp_days_{reg_key}"] = new_ex_days
                     st.rerun()
 
-                if st.button("✅ OK", key="ok_extra_job", type="primary", use_container_width=True):
+                if st.button("✅ OK", key=f"ok_extra_{reg_key}", type="primary", use_container_width=True):
                     st.session_state.open_calendar = None
                     st.rerun()
 
-        if st.button("Add One-Off Job to Log", use_container_width=True):
-            if ex_name and st.session_state.extra_temp_days:
-                st.session_state.extra_items.append(
-                    {"name": ex_name, "rate": ex_rate, "days": st.session_state.extra_temp_days}
+        if st.button("Add One-Off Job to Log", key=f"add_extra_{reg_key}", use_container_width=True):
+            if ex_name and st.session_state[f"extra_temp_days_{reg_key}"]:
+                st.session_state[f"extra_items_{reg_key}"].append(
+                    {"name": ex_name, "rate": ex_rate, "days": st.session_state[f"extra_temp_days_{reg_key}"]}
                 )
-                st.session_state.extra_temp_days = []
+                st.session_state[f"extra_temp_days_{reg_key}"] = []
                 st.session_state.open_calendar = None
                 st.session_state.open_account = None
-                st.session_state.log_submitted = False
+                st.session_state[f"log_submitted_{reg_key}"] = False
                 st.rerun()
             else:
                 st.warning("Enter a job description and tap at least one date on the calendar.")
 
-        if st.session_state.extra_items:
+        if extra_list:
             st.markdown("**Added One-Off Jobs:**")
-            for idx, extra in enumerate(st.session_state.extra_items):
+            for idx, extra in enumerate(extra_list):
                 c1, c2 = st.columns([4, 1])
-                c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s) @ ${extra['rate']:,.2f}")
-                if c2.button("🗑️", key=f"del_extra_{idx}"):
-                    st.session_state.extra_items.pop(idx)
-                    st.session_state.log_submitted = False
+                if show_pricing:
+                    c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s) @ ${extra['rate']:,.2f}")
+                else:
+                    c1.write(f"• {extra['name']} — {len(extra['days'])} visit(s)")
+                if c2.button("🗑️", key=f"del_extra_{reg_key}_{idx}"):
+                    st.session_state[f"extra_items_{reg_key}"].pop(idx)
+                    st.session_state[f"log_submitted_{reg_key}"] = False
                     st.rerun()
 
     st.divider()
 
     st.subheader("2. Download PDF & Email Completed Log")
-    active_preview = summary_df[summary_df["Visits"] > 0][["Line Item", "Visits", "Amount", "Dates Visited"]]
+    preview_cols = ["Line Item", "Visits", "Amount", "Dates Visited"] if show_pricing else ["Line Item", "Visits", "Dates Visited"]
+    active_preview = summary_df[summary_df["Visits"] > 0][preview_cols]
 
     if active_preview.empty:
         st.info("No visits selected yet. Open any store group above and tap 'Tap to pick dates'.")
     else:
         st.dataframe(active_preview, use_container_width=True, hide_index=True)
 
-        pdf_bytes = generate_invoice_pdf(summary_df, billing_month, invoice_num, tech_name=tech_name)
-        pdf_filename = f"Monthly_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+        pdf_bytes = generate_invoice_pdf(
+            summary_df,
+            billing_month,
+            invoice_num,
+            region_name=reg_data["name"],
+            show_pricing=show_pricing,
+            tech_name=tech_name,
+        )
+        reg_slug = reg_data["name"].replace(" ", "_")
+        if show_pricing:
+            pdf_filename = f"{reg_slug}_Visit_Log_{billing_month.replace(' ', '_')}_Inv_{invoice_num}.pdf"
+            dl_label = "📄 1. Download PDF to Attach in Novo"
+        else:
+            pdf_filename = f"{reg_slug}_Visit_Log_{billing_month.replace(' ', '_')}.pdf"
+            dl_label = "📄 1. Download PDF Visit Log"
 
         st.download_button(
-            label="📄 1. Download PDF to Attach in Novo",
+            label=dl_label,
             data=pdf_bytes,
             file_name=pdf_filename,
             mime="application/pdf",
@@ -914,7 +1165,7 @@ def render_visit_log_page():
         )
 
         tech_copy_email = st.text_input(
-            "Send a PDF copy to yourself (optional — for uploading to Novo):",
+            "Send a PDF copy to yourself (optional):",
             value="",
             placeholder="your.email@gmail.com",
             help="Leave blank if you only want to send to the Team email.",
@@ -928,42 +1179,49 @@ def render_visit_log_page():
                     invoice_num,
                     tot_visits,
                     tot_amt,
+                    region_name=reg_data["name"],
+                    show_pricing=show_pricing,
                     tech_name=tech_name,
                     tech_copy_email=tech_copy_email,
                 )
-                st.session_state.log_submitted = True
+                st.session_state[f"log_submitted_{reg_key}"] = True
                 st.session_state.confirm_leave_log = False
+                summary_msg = f"${tot_amt:,.2f} across {tot_visits} visits" if show_pricing else f"{tot_visits} verified visits"
                 if tech_copy_email.strip():
                     st.success(
-                        f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
-                        f"emailed to Team and {tech_copy_email.strip()}. You can now safely return Home."
+                        f"Sent! Completed {reg_data['name']} {billing_month} PDF log ({summary_msg}) "
+                        f"emailed to Team and {tech_copy_email.strip()}."
                     )
                 else:
                     st.success(
-                        f"Sent! Completed {billing_month} PDF log (${tot_amt:,.2f} across {tot_visits} visits) "
-                        f"emailed to Team. You can now safely return Home."
+                        f"Sent! Completed {reg_data['name']} {billing_month} PDF log ({summary_msg}) "
+                        f"emailed to Team."
                     )
             except Exception as e:
                 st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
 
     st.divider()
-    if st.button("← Back to Home", key="bottom_back_log", use_container_width=True):
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_log", use_container_width=True):
         if has_unsaved:
             st.session_state.confirm_leave_log = True
             st.rerun()
         else:
-            navigate_to("home")
+            navigate_to("hub")
 
 
 # ==============================================================================
-# PAGE 3: DENVER ROUTE OPTIMIZER
+# PAGE 3: REGIONAL ROUTE OPTIMIZER
 # ==============================================================================
 def render_route_optimizer_page():
-    if st.button("← Back to Home", key="top_back_route"):
-        navigate_to("home")
+    reg_key, reg_data = get_active_region()
+    home_base = reg_data["home_base"]
+    route_stops = reg_data["route_stops"]
 
-    st.title("🗺️ Denver Route Optimizer")
-    st.caption(f"Starts & ends at **{HOME_BASE['address']}**")
+    if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_route"):
+        navigate_to("hub")
+
+    st.title(f"🗺️ {reg_data['name']} Route Optimizer")
+    st.caption(f"Starts & ends at **{home_base['address']}**")
 
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     today_short = day_names[datetime.now().weekday()]
@@ -973,26 +1231,26 @@ def render_route_optimizer_page():
         selected_day = st.selectbox("Route Day", options=day_names, index=day_names.index(today_short))
     with col_rt:
         st.markdown("<div style='height:1.65rem;'></div>", unsafe_allow_html=True)
-        round_trip = st.checkbox("Return to Lakewood", value=True)
+        round_trip = st.checkbox(f"Return to {home_base['short_label']}", value=True)
 
-    scheduled_stops = [s for s in ROUTE_STOPS if selected_day in s["days"]]
-    flex_stops = [s for s in ROUTE_STOPS if selected_day not in s["days"]]
+    scheduled_stops = [s for s in route_stops if selected_day in s["days"]]
+    flex_stops = [s for s in route_stops if selected_day not in s["days"]]
 
     st.subheader(f"1. Commonly Scheduled Stops for {selected_day} ({len(scheduled_stops)})")
     selected_stop_ids = []
     if scheduled_stops:
         for s in scheduled_stops:
-            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=True, key=f"sch_{s['id']}"):
+            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=True, key=f"sch_{reg_key}_{s['id']}"):
                 selected_stop_ids.append(s["id"])
     else:
-        st.info(f"Only King Soopers Leetsdale is commonly scheduled on {selected_day}s. Add flexible or other stops below.")
+        st.info(f"No fixed stops are pre-checked for {selected_day}s. Add flexible or other stops below.")
 
-    with st.expander(f"➕ Add Flexible / Optional Stops ({len(flex_stops)} available)", expanded=(selected_day in ["Wed", "Thu", "Fri", "Sat"])):
+    with st.expander(f"➕ Add Flexible / Optional Stops ({len(flex_stops)} available)", expanded=(len(scheduled_stops) == 0 or selected_day in ["Wed", "Thu", "Fri", "Sat"])):
         for s in flex_stops:
-            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=False, key=f"flx_{s['id']}"):
+            if st.checkbox(f"**{s['store']}** ({s['line']}) — {s['address']}", value=False, key=f"flx_{reg_key}_{s['id']}"):
                 selected_stop_ids.append(s["id"])
 
-    chosen_stops = [s for s in ROUTE_STOPS if s["id"] in selected_stop_ids]
+    chosen_stops = [s for s in route_stops if s["id"] in selected_stop_ids]
 
     st.divider()
     st.subheader(f"2. Optimized Stop Sequence ({len(chosen_stops)} stops)")
@@ -1000,9 +1258,9 @@ def render_route_optimizer_page():
     if not chosen_stops:
         st.warning("Select at least one stop above to build your route.")
     else:
-        ordered = order_stops_nearest_neighbor(chosen_stops, round_trip=round_trip)
+        ordered = order_stops_nearest_neighbor(chosen_stops, home_base=home_base)
 
-        route_rows = [{"Stop #": "Start", "Location": HOME_BASE["name"], "Service": "-", "Address": HOME_BASE["address"]}]
+        route_rows = [{"Stop #": "Start", "Location": home_base["name"], "Service": "-", "Address": home_base["address"]}]
         for idx, s in enumerate(ordered, start=1):
             route_rows.append(
                 {
@@ -1013,13 +1271,13 @@ def render_route_optimizer_page():
                 }
             )
         if round_trip:
-            route_rows.append({"Stop #": "End", "Location": HOME_BASE["name"], "Service": "-", "Address": HOME_BASE["address"]})
+            route_rows.append({"Stop #": "End", "Location": home_base["name"], "Service": "-", "Address": home_base["address"]})
 
         st.dataframe(pd.DataFrame(route_rows), use_container_width=True, hide_index=True)
 
-        address_lines = [HOME_BASE["address"]] + [s["address"] for s in ordered]
+        address_lines = [home_base["address"]] + [s["address"] for s in ordered]
         if round_trip:
-            address_lines.append(HOME_BASE["address"])
+            address_lines.append(home_base["address"])
         address_list_text = "\n".join(address_lines)
 
         st.markdown("**📋 Copy Selected Address List (for RouteXL.com):**")
@@ -1035,19 +1293,21 @@ def render_route_optimizer_page():
             st.link_button("🚀 Launch RouteXL.com", "https://www.routexl.com", type="primary", use_container_width=True)
 
     st.divider()
-    if st.button("← Back to Home", key="bottom_back_route", use_container_width=True):
-        navigate_to("home")
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_route", use_container_width=True):
+        navigate_to("hub")
 
 
 # ==============================================================================
 # PAGE 4: INSURANCE POLICY & COI UPLOAD
 # ==============================================================================
 def render_insurance_upload_page():
-    if st.button("← Back to Home", key="top_back_ins"):
-        navigate_to("home")
+    _, reg_data = get_active_region()
+
+    if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_ins"):
+        navigate_to("hub")
 
     st.title("🛡️ Insurance Policy & COI Upload")
-    st.caption("Fill out your policy details below, drop your PDF Certificate of Insurance, and email it to the team.")
+    st.caption(f"{reg_data['name']} — Fill out your policy details below, drop your PDF Certificate of Insurance, and email it to the team.")
 
     with st.container(border=True):
         col1, col2 = st.columns(2)
@@ -1114,6 +1374,7 @@ def render_insurance_upload_page():
                     send_insurance_email(
                         pdf_bytes=uploaded_pdf.getvalue(),
                         pdf_filename=uploaded_pdf.name,
+                        region_name=reg_data["name"],
                         tech_name=tech_name,
                         company_name=company_name,
                         policy_type=policy_type,
@@ -1137,29 +1398,32 @@ def render_insurance_upload_page():
                     st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
 
     st.divider()
-    if st.button("← Back to Home", key="bottom_back_ins", use_container_width=True):
-        navigate_to("home")
+    if st.button(f"← Back to {reg_data['name']} Hub", key="bottom_back_ins", use_container_width=True):
+        navigate_to("hub")
 
 
 # ==============================================================================
 # PAGE 5: LOT HAZARD & ILLEGAL DUMPING REPORT
 # ==============================================================================
 def render_hazard_report_page():
-    if st.button("← Back to Home", key="top_back_haz"):
-        navigate_to("home")
+    _, reg_data = get_active_region()
+    route_stops = reg_data["route_stops"]
 
-    st.title("🚨 Lot Hazard & Dumping Report")
+    if st.button(f"← Back to {reg_data['name']} Hub", key="top_back_haz"):
+        navigate_to("hub")
+
+    st.title(f"🚨 {reg_data['name']} Lot Hazard & Dumping Report")
     st.caption("Document blocked areas, illegal bulk dumping, or lot damage with a timestamped photo and email proof.")
 
-    store_options = [f"{s['store']} — {s['address']}" for s in ROUTE_STOPS] + ["Other / Custom Location"]
+    store_options = [f"{s['store']} — {s['address']}" for s in route_stops] + ["Other / Custom Location"]
 
     with st.container(border=True):
         tech_name = st.text_input("Tech Name *", placeholder="Enter your name", key="haz_tech")
         selected_store = st.selectbox("Select Store / Property *", options=store_options)
 
         if selected_store == "Other / Custom Location":
-            store_name = st.text_input("Custom Location Name *", placeholder="e.g., King Soopers - Colfax")
-            store_address = st.text_input("Custom Street Address *", placeholder="e.g., 1234 E Colfax Ave, Denver, CO")
+            store_name = st.text_input("Custom Location Name *", placeholder="e.g., King Soopers - North Gate")
+            store_address = st.text_input("Custom Street Address *", placeholder="e.g., 2731 North Gate Blvd, Colorado Springs, CO")
         else:
             store_name, store_address = selected_store.split(" — ", 1)
 
@@ -1211,217 +1475,4 @@ def render_hazard_report_page():
             else:
                 try:
                     ts_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-                    p_bytes = photo_file.getvalue() if photo_file is not None else None
-                    p_name = photo_file.name if (photo_file is not None and hasattr(photo_file, "name")) else "hazard_photo.jpg"
-                    p_ext = p_name.split(".")[-1] if "." in p_name else "jpg"
-
-                    haz_pdf = generate_hazard_pdf(
-                        tech_name=tech_name,
-                        store_name=store_name,
-                        store_address=store_address,
-                        timestamp_str=ts_str,
-                        issues=selected_issues,
-                        severity=severity,
-                        details=details,
-                        photo_bytes=p_bytes,
-                        photo_ext=p_ext,
-                    )
-                    send_hazard_email(
-                        pdf_bytes=haz_pdf,
-                        tech_name=tech_name,
-                        store_name=store_name,
-                        store_address=store_address,
-                        timestamp_str=ts_str,
-                        issues=selected_issues,
-                        severity=severity,
-                        details=details,
-                        photo_bytes=p_bytes,
-                        photo_filename=p_name,
-                    )
-                    st.success(f"Sent! Timestamped hazard report for **{store_name}** emailed to the team.")
-                except Exception as e:
-                    st.error(f"Could not send report — check Streamlit Secrets email settings. Details: {e}")
-
-    st.divider()
-    if st.button("← Back to Home", key="bottom_back_haz", use_container_width=True):
-        navigate_to("home")
-
-
-# ==============================================================================
-# PAGE 6: HOPPER DUMP & MAINTENANCE LOG
-# ==============================================================================
-def render_maintenance_log_page():
-    if st.button("← Back to Home", key="top_back_maint"):
-        navigate_to("home")
-
-    st.title("🗑️ Hopper Dump & Maintenance")
-    st.caption("Log hopper dump loads and sweeper parts or repair needs.")
-
-    with st.container(border=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            tech_name = st.text_input("Tech / Driver Name *", placeholder="Enter your name", key="mnt_tech")
-        with col2:
-            unit_num = st.text_input("Truck / Sweeper Unit # *", placeholder="e.g., Unit 1 / Schwarze A4")
-
-        col3, col4 = st.columns(2)
-        with col3:
-            log_date = st.date_input("Date *", value=date.today(), key="mnt_date")
-        with col4:
-            odometer_hrs = st.text_input("Odometer / Aux Hours", placeholder="e.g., 84,210 mi / 1,420 hrs")
-
-        log_types = st.multiselect(
-            "What are you logging today? *",
-            options=["Hopper Dump", "Parts / Repair Needed"],
-            default=["Hopper Dump"],
-        )
-
-        dump_location = ""
-        dump_load = "N/A"
-        if "Hopper Dump" in log_types:
-            st.markdown("**🗑️ Hopper Dump Details**")
-            d1, d2 = st.columns(2)
-            with d1:
-                dump_location = st.text_input("Dump Site / Transfer Station", placeholder="e.g., HQ Roll-off / DADS Landfill")
-            with d2:
-                dump_load = st.selectbox("Estimated Hopper Load", options=["1/4 Full", "1/2 Full", "3/4 Full", "Full Load"])
-
-        repair_items = []
-        if "Parts / Repair Needed" in log_types:
-            st.markdown("**🔧 Flag Parts / Repair Items**")
-            part_choices = [
-                "Main Tube Broom Worn",
-                "Side Gutter Brush Worn",
-                "Hydraulic Hose / Fluid Leak",
-                "Water Dust-Suppression Nozzle / Pump",
-                "Suction Hood / Rubber Flaps",
-                "Strobe / Work / Headlights",
-                "Tires / Brakes / Suspension",
-                "Auxiliary Engine Issue",
-            ]
-            c_p1, c_p2 = st.columns(2)
-            for idx, item in enumerate(part_choices):
-                target_col = c_p1 if idx % 2 == 0 else c_p2
-                with target_col:
-                    if st.checkbox(item, key=f"prt_{idx}"):
-                        repair_items.append(item)
-
-        notes = st.text_area(
-            "Notes / Details",
-            placeholder="Any dump ticket details, urgent repair notes, or part numbers...",
-            height=80,
-        )
-
-        attachment = st.file_uploader(
-            "Attach Dump Ticket or Repair Photo (Optional)",
-            type=["jpg", "jpeg", "png", "pdf"],
-        )
-
-        if st.button("📧 Email Hopper & Maintenance Log to Team", type="primary", use_container_width=True):
-            if not tech_name.strip() or not unit_num.strip():
-                st.warning("Please enter your Name and Truck / Sweeper Unit #.")
-            elif not log_types:
-                st.warning("Select at least one log category above.")
-            else:
-                try:
-                    att_bytes = attachment.getvalue() if attachment is not None else None
-                    att_name = attachment.name if attachment is not None else ""
-                    send_maintenance_email(
-                        tech_name=tech_name,
-                        unit_num=unit_num,
-                        log_date=log_date.strftime("%Y-%m-%d"),
-                        log_types=log_types,
-                        odometer_hrs=odometer_hrs,
-                        dump_location=dump_location,
-                        dump_load=dump_load,
-                        repair_items=repair_items,
-                        notes=notes,
-                        attachment_bytes=att_bytes,
-                        attachment_name=att_name,
-                    )
-                    st.success(f"Sent! Hopper & Maintenance log for **{unit_num}** emailed to the team.")
-                except Exception as e:
-                    st.error(f"Could not send log — check Streamlit Secrets email settings. Details: {e}")
-
-    st.divider()
-    if st.button("← Back to Home", key="bottom_back_maint", use_container_width=True):
-        navigate_to("home")
-
-
-# ==============================================================================
-# PAGE 7: SITE NOTES, GATE CODES & CONTACTS DIRECTORY
-# ==============================================================================
-def render_site_directory_page():
-    if st.button("← Back to Home", key="top_back_dir"):
-        navigate_to("home")
-
-    st.title("🔑 Site Notes, Gate Codes & Contacts")
-    st.caption("Quick reference for store addresses, service lines, lot access, and dispatch contacts.")
-
-    with st.container(border=True):
-        st.subheader("📞 Dispatch & Emergency Contacts")
-        st.link_button(
-            "💬 Text Lone Wolf Dispatch (1-719-434-0294)",
-            "sms:+17194340294",
-            type="primary",
-            use_container_width=True,
-        )
-        for ec in EMERGENCY_CONTACTS:
-            st.markdown(f"**{ec['role']}:** {ec['contact']}")
-
-    st.divider()
-
-    f_col1, f_col2 = st.columns([2.2, 1.2])
-    with f_col1:
-        search_q = st.text_input("Search Store or Address", placeholder="e.g., Lowe's, Holly, 80120...")
-    with f_col2:
-        line_filter = st.selectbox("Service Line", options=["All", "Sweep", "Dual"])
-
-    filtered_stops = []
-    for s in ROUTE_STOPS:
-        if line_filter != "All" and s["line"] != line_filter:
-            continue
-        if search_q.strip():
-            q = search_q.strip().lower()
-            if q not in s["store"].lower() and q not in s["address"].lower():
-                continue
-        filtered_stops.append(s)
-
-    st.caption(f"Showing **{len(filtered_stops)}** of {len(ROUTE_STOPS)} locations")
-
-    for s in filtered_stops:
-        sched_label = ", ".join(s["days"]) if s["days"] else f"Flexible ({s['flex']})"
-        note_info = SITE_NOTES.get(
-            s["id"],
-            {
-                "curfew": "Run amber strobes; follow standard overnight noise courtesy. Report discrepancies or issues to Lone Wolf.",
-            },
-        )
-        with st.expander(f"**{s['store']}** ({s['line']}) — {sched_label}"):
-            st.markdown(f"📍 **Address:** `{s['address']}`")
-            st.markdown(f"📅 **Schedule:** {sched_label}  |  **Flex Rule:** {s['flex']}")
-            st.markdown("🔐 **Gate / Lot Access:** Open")
-            st.markdown(f"🌙 **Nightly Notes:** {note_info['curfew']}")
-
-    st.divider()
-    if st.button("← Back to Home", key="bottom_back_dir", use_container_width=True):
-        navigate_to("home")
-
-
-# ==============================================================================
-# ROUTER
-# ==============================================================================
-if st.session_state.current_page == "home":
-    render_home_page()
-elif st.session_state.current_page == "visit_log":
-    render_visit_log_page()
-elif st.session_state.current_page == "route_optimizer":
-    render_route_optimizer_page()
-elif st.session_state.current_page == "insurance_upload":
-    render_insurance_upload_page()
-elif st.session_state.current_page == "hazard_report":
-    render_hazard_report_page()
-elif st.session_state.current_page == "maintenance_log":
-    render_maintenance_log_page()
-elif st.session_state.current_page == "site_directory":
-    render_site_directory_page()
+                    p_bytes = photo_file.getvalue() if photo_file is not
