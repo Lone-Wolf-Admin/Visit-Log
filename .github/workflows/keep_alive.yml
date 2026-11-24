@@ -1,15 +1,13 @@
-name: Keep Streamlit App Awake
+name: Keep Render Alive
 
 on:
   schedule:
-    # Runs twice a day (at 6:00 AM and 6:00 PM UTC)
-    - cron: "0 6,18 * * *"
-  workflow_dispatch:
+    - cron: '*/5 * * * *' # Runs every 5 minutes to buffer against GitHub cron delays
+  workflow_dispatch: # Allows manual testing
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Streamlit App
-        run: |
-          curl -L -s -o /dev/null -w "%{http_code}\n" "https://visit-log.streamlit.app"
+      - name: Ping Render App
+        run: curl -fsSL --max-time 60 --retry 2 https://the-real-estate-matchmaker.onrender.com > /dev/null
