@@ -328,8 +328,8 @@ def current_week_sunday_key() -> str:
 def default_bucket_state() -> dict:
     return {
         "week_start": current_week_sunday_key(),
-        "checked_ids": [],
-        "last_night_emailed_ids": [],
+        "pending_checked_ids": [],
+        "emailed_completed_ids": [],
         "last_night_email_at": "",
         "last_saturday_alert_week": "",
         "custom_items": [],
@@ -683,6 +683,121 @@ def generate_hazard_pdf(
     return bytes(pdf.output())
 
 
+def _pdf_safe(text: str) -> str:
+    """Normalizes Unicode punctuation so core Helvetica PDF text never raises encoding errors."""
+    replacements = {
+        "\u2014": "-",
+        "\u2013": "-",
+        "\u2019": "'",
+        "\u2018": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2022": "-",
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
+def generate_checkoff_pdf(
+    report_title: str,
+    subtitle: str,
+    week_start: str,
+    timestamp_str: str,
+    tech_label: str,
+    primary_items: list[dict],
+    secondary_items: list[dict],
+    primary_heading: str,
+    secondary_heading: str,
+    accent_rgb: tuple[int, int, int] = (15, 76, 129),
+) -> bytes:
+    """Builds a clean, structured PDF report for Colorado Springs Check-Off Routes."""
+    pdf = FPDF(orientation="P", unit="mm", format="Letter")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # Header banner
+    pdf.set_fill_color(*accent_rgb)
+    pdf.rect(10, 10, 196, 24, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 13.5)
+    pdf.set_xy(14, 14)
+    pdf.cell(188, 7, _pdf_safe(report_title))
+    pdf.set_font("Helvetica", "", 9.5)
+    pdf.set_xy(14, 22.5)
+    pdf.cell(
+        188,
+        6,
+        _pdf_safe(f"{subtitle}  |  Week of Sun {week_start}  |  Generated: {timestamp_str}  |  Tech: {tech_label}"),
+    )
+
+    # Summary strip
+    pdf.set_text_color(15, 23, 42)
+    pdf.set_xy(10, 38)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(241, 245, 249)
+    pdf.cell(98, 8, _pdf_safe(f"{primary_heading}: {len(primary_items)}"), border=1, fill=True)
+    pdf.cell(98, 8, _pdf_safe(f"{secondary_heading}: {len(secondary_items)}"), border=1, fill=True, align="R")
+    pdf.ln(12)
+
+    def render_grouped_section(heading: str, items: list[dict], badge_char: str):
+        if pdf.get_y() > 245:
+            pdf.add_page()
+        pdf.set_x(10)
+        pdf.set_fill_color(30, 41, 59)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.cell(196, 7.5, _pdf_safe(f"  {heading} ({len(items)})"), border=1, fill=True)
+        pdf.ln(9)
+
+        pdf.set_text_color(15, 23, 42)
+        if not items:
+            pdf.set_x(10)
+            pdf.set_font("Helvetica", "I", 9.5)
+            pdf.cell(196, 7, _pdf_safe("  No items in this section."), border=1)
+            pdf.ln(10)
+            return
+
+        groups_seen = []
+        for it in items:
+            g = it.get("group", "General")
+            if g not in groups_seen:
+                groups_seen.append(g)
+
+        for grp in groups_seen:
+            grp_list = [x for x in items if x.get("group", "General") == grp]
+            if pdf.get_y() > 248:
+                pdf.add_page()
+            pdf.set_x(10)
+            pdf.set_fill_color(226, 232, 240)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(196, 6.5, _pdf_safe(f"  {grp}"), border=1, fill=True)
+            pdf.ln(7)
+
+            for idx, item in enumerate(grp_list):
+                if pdf.get_y() > 256:
+                    pdf.add_page()
+                pdf.set_x(10)
+                pdf.set_fill_color(248, 250, 252) if idx % 2 == 1 else pdf.set_fill_color(255, 255, 255)
+                pdf.set_font("Helvetica", "B", 9)
+                line_txt = f"  [{badge_char}] {item['label']}"
+                pdf.cell(196, 5.5, _pdf_safe(line_txt[:112]), border="LR", fill=True)
+                pdf.ln(5.5)
+                pdf.set_x(10)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(71, 85, 105)
+                pdf.cell(196, 5, _pdf_safe(f"       Address: {item['address']}"[:122]), border="LBR", fill=True)
+                pdf.set_text_color(15, 23, 42)
+                pdf.ln(5)
+
+            pdf.ln(2)
+
+    render_grouped_section(primary_heading, primary_items, "X" if "Completed" in primary_heading else " ")
+    render_grouped_section(secondary_heading, secondary_items, " " if "Remaining" in secondary_heading else "X")
+
+    return bytes(pdf.output())
+
+
 def send_completion_email(
     pdf_bytes: bytes,
     billing_month: str,
@@ -899,7 +1014,8 @@ def send_maintenance_email(
 
 def send_nightly_checkoff_email(
     tech_name: str,
-    completed_items: list[dict],
+    newly_completed_items: list[dict],
+    all_completed_items: list[dict],
     remaining_items: list[dict],
     week_start: str,
     tech_copy_email: str = "",
@@ -916,20 +1032,42 @@ def send_nightly_checkoff_email(
 
     sender_label = tech_name.strip() if tech_name.strip() else "Springs Tech"
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-    done_lines = "\n".join(f"  [x] [{x['group']}] {x['label']} ({x['address']})" for x in completed_items) or "  (None)"
+    now_file = datetime.now().strftime("%Y-%m-%d")
+
+    pdf_bytes = generate_checkoff_pdf(
+        report_title="COLORADO SPRINGS - NIGHTLY CHECK-OFF REPORT",
+        subtitle="Nightly Completed Route Summary",
+        week_start=week_start,
+        timestamp_str=now_str,
+        tech_label=sender_label,
+        primary_items=newly_completed_items,
+        secondary_items=remaining_items,
+        primary_heading="Completed This Night / Batch",
+        secondary_heading="Remaining Open in Weekly Bucket",
+        accent_rgb=(15, 76, 129),
+    )
+
+    done_lines = "\n".join(f"  [x] [{x['group']}] {x['label']} ({x['address']})" for x in newly_completed_items) or "  (None)"
     rem_lines = "\n".join(f"  [ ] [{x['group']}] {x['label']}" for x in remaining_items) or "  (All items checked off for the week)"
 
     msg = EmailMessage()
-    msg["Subject"] = f"[Colorado Springs] Nightly Check-Off Completed ({sender_label}) — {len(completed_items)} Checked"
+    msg["Subject"] = f"[Colorado Springs] Nightly Check-Off Completed ({sender_label}) — {len(newly_completed_items)} Checked"
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
     msg.set_content(
         f"Hi Team,\n\n"
-        f"{sender_label} sent a nightly Check-Off Routes update for Colorado Springs.\n\n"
+        f"{sender_label} sent a nightly Check-Off Routes report for Colorado Springs. A clean PDF summary is attached.\n\n"
         f"- Timestamp: {now_str}\n"
         f"- Weekly Bucket Start (Sunday): {week_start}\n"
-        f"- Checked Off This Session ({len(completed_items)}):\n{done_lines}\n\n"
-        f"- Still Remaining in Weekly Bucket ({len(remaining_items)}):\n{rem_lines}\n"
+        f"- Completed This Batch ({len(newly_completed_items)}):\n{done_lines}\n\n"
+        f"- Total Completed This Week: {len(all_completed_items)}\n"
+        f"- Remaining Open in Weekly Bucket ({len(remaining_items)}):\n{rem_lines}\n"
+    )
+    msg.add_attachment(
+        pdf_bytes,
+        maintype="application",
+        subtype="pdf",
+        filename=f"Colorado_Springs_Nightly_CheckOff_{now_file}.pdf",
     )
 
     with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
@@ -949,6 +1087,21 @@ def send_saturday_unchecked_alert_email(
     recipient = st.secrets["email"]["recipient_email"]
 
     now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    now_file = datetime.now().strftime("%Y-%m-%d")
+
+    pdf_bytes = generate_checkoff_pdf(
+        report_title="COLORADO SPRINGS - SATURDAY UNCHECKED ALERT",
+        subtitle="Weekly Remaining Route Bucket Report",
+        week_start=week_start,
+        timestamp_str=now_str,
+        tech_label="Automated / Dispatch Alert",
+        primary_items=remaining_items,
+        secondary_items=completed_items,
+        primary_heading="Unchecked / Remaining Routes",
+        secondary_heading="Completed So Far This Week",
+        accent_rgb=(153, 27, 27),
+    )
+
     rem_lines = "\n".join(f"  [ ] [{x['group']}] {x['label']} — {x['address']}" for x in remaining_items) or "  (None — everything is checked off!)"
 
     msg = EmailMessage()
@@ -957,11 +1110,17 @@ def send_saturday_unchecked_alert_email(
     msg["To"] = recipient
     msg.set_content(
         f"Hi Team,\n\n"
-        f"Saturday afternoon check-off alert for Colorado Springs (Weekly Bucket started Sunday {week_start}).\n"
+        f"Saturday afternoon check-off alert for Colorado Springs (Weekly Bucket started Sunday {week_start}). A clean PDF report is attached.\n\n"
         f"- Report Time: {now_str}\n"
         f"- Completed So Far: {len(completed_items)}\n"
         f"- Unchecked / Remaining ({len(remaining_items)}):\n{rem_lines}\n\n"
         f"Reminder: The weekly bucket resets on Sunday for the new week.\n"
+    )
+    msg.add_attachment(
+        pdf_bytes,
+        maintype="application",
+        subtype="pdf",
+        filename=f"Colorado_Springs_Saturday_Alert_{now_file}.pdf",
     )
 
     with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
@@ -1059,15 +1218,17 @@ def render_hub_page():
     if reg_key == "springs":
         bucket = st.session_state.springs_bucket
         all_chk = get_all_springs_checkoff_items(bucket)
-        checked_set = set(bucket.get("checked_ids", []))
-        remaining_count = len([x for x in all_chk if x["id"] not in checked_set])
+        emailed_set = set(bucket.get("emailed_completed_ids", []))
+        pending_set = set(bucket.get("pending_checked_ids", []))
+        done_count = len([x for x in all_chk if x["id"] in emailed_set or x["id"] in pending_set])
+        open_count = len([x for x in all_chk if x["id"] not in emailed_set])
         with st.container(border=True):
             st.subheader("☑️ Check-Off Routes")
             st.write(
-                "Weekly checkbox bucket that keeps untouched stops until cleared out, emails nightly completed work, "
-                "and sends a Saturday afternoon alert for remaining items (resets Sundays)."
+                "Weekly checkbox bucket that keeps untouched stops until cleared out, shifts emailed stops to Completed, "
+                "and sends a PDF report nightly plus a Saturday afternoon alert."
             )
-            st.caption(f"Current weekly bucket: **{len(checked_set)}** checked  •  **{remaining_count}** remaining")
+            st.caption(f"Completed this week: **{done_count}**  •  Open in sections: **{open_count}**")
             if st.button("Open Check-Off Routes →", type="primary", use_container_width=True):
                 navigate_to("checkoff_routes")
 
@@ -1886,77 +2047,75 @@ def render_checkoff_routes_page():
 
     st.title("☑️ Check-Off Routes")
     st.caption(
-        f"Weekly bucket started **Sunday {bucket['week_start']}** (auto-resets every Sunday). "
-        "Untouched stops stay in the bucket until checked off."
+        f"Weekly bucket started **Sunday {bucket['week_start']}**. "
+        "Untouched stops stay in each section until checked off; once emailed, they shift to **Completed This Week**."
     )
 
     now_dt = datetime.now()
     all_items = get_all_springs_checkoff_items(bucket)
-    checked_ids = set(bucket.get("checked_ids", []))
-    completed_items = [x for x in all_items if x["id"] in checked_ids]
-    remaining_items = [x for x in all_items if x["id"] not in checked_ids]
+    emailed_set = set(bucket.get("emailed_completed_ids", []))
+    pending_set = set(bucket.get("pending_checked_ids", []))
+
+    completed_items = [x for x in all_items if x["id"] in emailed_set]
+    newly_checked_items = [x for x in all_items if x["id"] in pending_set and x["id"] not in emailed_set]
+    open_section_items = [x for x in all_items if x["id"] not in emailed_set]
 
     if now_dt.weekday() == 5 and now_dt.hour >= 12 and bucket.get("last_saturday_alert_week") != bucket["week_start"]:
         try:
             send_saturday_unchecked_alert_email(
-                remaining_items=remaining_items,
-                completed_items=completed_items,
+                remaining_items=open_section_items,
+                completed_items=completed_items + newly_checked_items,
                 week_start=bucket["week_start"],
             )
             bucket["last_saturday_alert_week"] = bucket["week_start"]
             save_springs_bucket(bucket)
-            st.info(f"Saturday afternoon alert sent: **{len(remaining_items)}** unchecked route(s) remaining.")
+            st.info(f"Saturday afternoon alert sent: **{len(open_section_items)}** unchecked route(s) remaining.")
         except Exception:
             pass
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Total in Bucket", len(all_items))
-    m2.metric("Checked Off", len(completed_items))
-    m3.metric("Remaining", len(remaining_items))
+    m1.metric("Open in Sections", len(open_section_items))
+    m2.metric("Checked (Ready to Email)", len(newly_checked_items))
+    m3.metric("Completed This Week", len(completed_items))
 
     tech_name = st.text_input("Tech Name (for Nightly Email)", value="", placeholder="Enter tech name", key="chk_tech_name")
     copy_email = st.text_input("Copy Nightly Email to (Optional)", value="", placeholder="your.email@gmail.com", key="chk_copy_email")
 
     st.divider()
-    st.subheader("1. Weekly Route Bucket (Check Off Completed Work)")
-    st.caption("Check off stops completed; untouched items stay in the bucket until checked off or reset on Sunday.")
+    st.subheader("1. Open Route Sections")
+    st.caption("Check off completed items below. Once you click **Email Night's Completed Work**, emailed items move to **Completed This Week**.")
 
-    live_checked_ids = []
-    for grp in SPRINGS_CHECKOFF_GROUPS:
-        grp_items = [x for x in all_items if x["group"] == grp]
-        if not grp_items:
+    live_pending_ids = []
+    all_section_names = list(SPRINGS_CHECKOFF_GROUPS)
+    for it in open_section_items:
+        if it["group"] not in all_section_names:
+            all_section_names.append(it["group"])
+
+    for grp in all_section_names:
+        grp_open_items = [x for x in open_section_items if x["group"] == grp]
+        if not grp_open_items:
             continue
-        grp_done = sum(1 for x in grp_items if x["id"] in checked_ids)
-        with st.expander(f"**{grp}** ({grp_done}/{len(grp_items)} checked)", expanded=True):
-            for item in grp_items:
-                default_val = item["id"] in checked_ids
+        grp_pending_cnt = sum(1 for x in grp_open_items if x["id"] in pending_set)
+        header_label = f"**{grp}** — {len(grp_open_items)} remaining"
+        if grp_pending_cnt > 0:
+            header_label += f" ({grp_pending_cnt} checked to email)"
+
+        with st.expander(header_label, expanded=True):
+            for item in grp_open_items:
+                default_val = item["id"] in pending_set
                 is_chk = st.checkbox(
                     f"**{item['label']}**  \n`{item['address']}`",
                     value=default_val,
-                    key=f"chk_box_{item['id']}_{bucket['week_start']}",
+                    key=f"chk_open_{item['id']}_{bucket['week_start']}_{bucket.get('last_night_email_at', '')}",
                 )
                 if is_chk:
-                    live_checked_ids.append(item["id"])
+                    live_pending_ids.append(item["id"])
 
-    other_grp_items = [x for x in all_items if x["group"] not in SPRINGS_CHECKOFF_GROUPS]
-    if other_grp_items:
-        with st.expander("**Extra / Added Stops**", expanded=True):
-            for item in other_grp_items:
-                default_val = item["id"] in checked_ids
-                is_chk = st.checkbox(
-                    f"**{item['label']}**  \n`{item['address']}`",
-                    value=default_val,
-                    key=f"chk_box_{item['id']}_{bucket['week_start']}",
-                )
-                if is_chk:
-                    live_checked_ids.append(item["id"])
-
-    if sorted(live_checked_ids) != sorted(bucket.get("checked_ids", [])):
-        bucket["checked_ids"] = live_checked_ids
+    if sorted(live_pending_ids) != sorted(bucket.get("pending_checked_ids", [])):
+        bucket["pending_checked_ids"] = live_pending_ids
         save_springs_bucket(bucket)
-        checked_ids = set(live_checked_ids)
-        completed_items = [x for x in all_items if x["id"] in checked_ids]
-        remaining_items = [x for x in all_items if x["id"] not in checked_ids]
+        pending_set = set(live_pending_ids)
+        newly_checked_items = [x for x in all_items if x["id"] in pending_set and x["id"] not in emailed_set]
 
     with st.expander("➕ Add Custom Stop to This Week's Bucket"):
         c_label = st.text_input("Stop / Task Name *", placeholder="e.g., Extra Porter Run — North Gate")
@@ -1978,26 +2137,35 @@ def render_checkoff_routes_page():
                 st.warning("Enter both a stop/task name and an address.")
 
     st.divider()
-    st.subheader("2. Nightly Completed Email & Saturday Unchecked Alert")
+    st.subheader("2. Email Nightly PDF & Saturday Unchecked Alert")
 
     col_n, col_s = st.columns(2)
     with col_n:
         if st.button("📧 Email Night's Completed Work", type="primary", use_container_width=True):
-            if not completed_items:
-                st.warning("Check off at least one route item first before emailing nightly completed work.")
+            if not newly_checked_items:
+                st.warning("Check off at least one new route item in the sections above before emailing nightly work.")
             else:
                 try:
+                    updated_emailed = list(dict.fromkeys(bucket.get("emailed_completed_ids", []) + [x["id"] for x in newly_checked_items]))
+                    updated_all_completed = [x for x in all_items if x["id"] in set(updated_emailed)]
+                    updated_remaining = [x for x in all_items if x["id"] not in set(updated_emailed)]
+
                     send_nightly_checkoff_email(
                         tech_name=tech_name,
-                        completed_items=completed_items,
-                        remaining_items=remaining_items,
+                        newly_completed_items=newly_checked_items,
+                        all_completed_items=updated_all_completed,
+                        remaining_items=updated_remaining,
                         week_start=bucket["week_start"],
                         tech_copy_email=copy_email,
                     )
-                    bucket["last_night_emailed_ids"] = [x["id"] for x in completed_items]
+                    bucket["emailed_completed_ids"] = updated_emailed
+                    bucket["pending_checked_ids"] = []
                     bucket["last_night_email_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
                     save_springs_bucket(bucket)
-                    st.success(f"Sent! Nightly completed work ({len(completed_items)} item(s)) emailed to the team.")
+                    st.success(
+                        f"Sent! Nightly PDF ({len(newly_checked_items)} item(s)) emailed and shifted to **Completed This Week**."
+                    )
+                    st.rerun()
                 except Exception as e:
                     st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
 
@@ -2005,13 +2173,13 @@ def render_checkoff_routes_page():
         if st.button("⚠️ Send Saturday Unchecked Alert", type="secondary", use_container_width=True):
             try:
                 send_saturday_unchecked_alert_email(
-                    remaining_items=remaining_items,
-                    completed_items=completed_items,
+                    remaining_items=open_section_items,
+                    completed_items=completed_items + newly_checked_items,
                     week_start=bucket["week_start"],
                 )
                 bucket["last_saturday_alert_week"] = bucket["week_start"]
                 save_springs_bucket(bucket)
-                st.success(f"Sent! Unchecked alert ({len(remaining_items)} remaining) emailed to the team.")
+                st.success(f"Sent! Saturday PDF alert ({len(open_section_items)} remaining) emailed to the team.")
             except Exception as e:
                 st.error(f"Could not send alert — check Streamlit Secrets email settings. Details: {e}")
 
@@ -2019,8 +2187,20 @@ def render_checkoff_routes_page():
         st.caption(f"Last nightly email sent: **{bucket['last_night_email_at']}**")
 
     st.divider()
-    st.subheader("3. Weekly Reset (Occurs Every Sunday)")
-    st.caption("Unchecked items stay in the bucket all week; tap below if you want to uncheck all boxes for a fresh start now.")
+    st.subheader("3. Completed This Week")
+    if not completed_items:
+        st.info("No emailed items in Completed This Week yet.")
+    else:
+        for grp in all_section_names + ["Extra / Added Stops"]:
+            grp_done = [x for x in completed_items if x.get("group") == grp]
+            if grp_done:
+                with st.expander(f"✅ **{grp}** ({len(grp_done)} completed)", expanded=False):
+                    for d_item in grp_done:
+                        st.markdown(f"- ~~**{d_item['label']}**~~ — `{d_item['address']}`")
+
+    st.divider()
+    st.subheader("4. Weekly Reset (Testing)")
+    st.caption("Unchecked items stay in the bucket all week; tap below when you want to clear everything for a fresh test.")
     if st.button("🔄 Uncheck All / Reset Weekly Bucket Now", use_container_width=True):
         st.session_state.springs_bucket = default_bucket_state()
         save_springs_bucket(st.session_state.springs_bucket)
