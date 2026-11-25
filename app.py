@@ -1,5 +1,7 @@
 import calendar
 import io
+import json
+import os
 import re
 import smtplib
 from datetime import date, datetime
@@ -20,6 +22,8 @@ VEHICLE_CHECKLIST_URL = (
     "1FAIpQLSfCzvudWQIQ1CwfNm4CFThLVaklEv3sz2JVIQ6HCjsQw0xHrw/"
     "viewform?usp=sharing&ouid=118278623880257833513"
 )
+
+SPRINGS_BUCKET_FILE = "springs_checkoff_bucket.json"
 
 # Mobile-first CSS: clears top Streamlit banner, keeps 7-column calendar grid on 1 row, and styles buttons
 st.markdown(
@@ -241,6 +245,42 @@ SPRINGS_ROUTE_STOPS = [
     {"id": "csr_or_off", "store": "Oracle Blvd Office Units", "address": "12265 Oracle Blvd, Colorado Springs, CO 80921", "line": "Sweep", "flex": "Yes", "days": [], "lat": 39.0112, "lon": -104.8015},
 ]
 
+SPRINGS_CHECKOFF_GROUPS = [
+    "Walgreens (1x a week all)",
+    "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921",
+    "Kingsoopers 6255 Sawcut PT, Fountain, Co",
+    "Lowes springs (1x Weekly except Fountain at 2x)",
+    "B Shops (1x Week)",
+]
+
+SPRINGS_CHECKOFF_ITEMS = [
+    # Walgreens (1x a week all)
+    {"id": "chk_wg_barnes", "group": "Walgreens (1x a week all)", "label": "Barnes", "address": "6075 Barnes Rd, Colorado Springs, CO 80922"},
+    {"id": "chk_wg_academy", "group": "Walgreens (1x a week all)", "label": "N Academy", "address": "3480 N Academy Blvd, Colorado Springs, CO 80917"},
+    {"id": "chk_wg_dublin", "group": "Walgreens (1x a week all)", "label": "Dublin", "address": "2785 Dublin Blvd, Colorado Springs, CO 80918"},
+    {"id": "chk_wg_circle", "group": "Walgreens (1x a week all)", "label": "N Circle", "address": "920 N Circle Dr, Colorado Springs, CO 80909"},
+    {"id": "chk_wg_nevada", "group": "Walgreens (1x a week all)", "label": "Nevada", "address": "2921 N Nevada Ave, Colorado Springs, CO 80907"},
+    {"id": "chk_wg_fountain_mesa", "group": "Walgreens (1x a week all)", "label": "Fountain Mesa", "address": "7910 Fountain Mesa Rd, Fountain, CO 80817"},
+    # Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921
+    {"id": "chk_ks_ng_sweep_1", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Sweep 1 Monday", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    {"id": "chk_ks_ng_sweep_2", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Sweep 2 Thursday", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    {"id": "chk_ks_ng_porter_1", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Porter 1 (day or night date dosent matter as long as 4x a week complete)", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    {"id": "chk_ks_ng_porter_2", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Porter 2 Monday with Sweep", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    {"id": "chk_ks_ng_porter_3", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Porter 3 Thursday with Sweep (can be moved to wednesday, friday for xmas week)", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    {"id": "chk_ks_ng_porter_4", "group": "Kingsoopers 2731 North Gate Blvd, Colorado Springs, Co 80921", "label": "Porter 4 (day or night date dosent matter as long as 4x a week complete)", "address": "2731 North Gate Blvd, Colorado Springs, CO 80921"},
+    # Kingsoopers 6255 Sawcut PT, Fountain, Co
+    {"id": "chk_ks_fnt_1", "group": "Kingsoopers 6255 Sawcut PT, Fountain, Co", "label": "Fountain 1 Monday", "address": "6255 Sawcut PT, Fountain, CO"},
+    {"id": "chk_ks_fnt_2", "group": "Kingsoopers 6255 Sawcut PT, Fountain, Co", "label": "Fountain 2 Thursday", "address": "6255 Sawcut PT, Fountain, CO"},
+    # Lowes springs (1x Weekly except Fountain at 2x)
+    {"id": "chk_lo_fnt_1", "group": "Lowes springs (1x Weekly except Fountain at 2x)", "label": "Fountain Lowe's 1", "address": "7710 Fountain Mesa Rd, Fountain, CO"},
+    {"id": "chk_lo_fnt_2", "group": "Lowes springs (1x Weekly except Fountain at 2x)", "label": "Fountain Lowes 2", "address": "7710 Fountain Mesa Rd, Fountain, CO"},
+    {"id": "chk_lo_nevada", "group": "Lowes springs (1x Weekly except Fountain at 2x)", "label": "Nevada", "address": "4880 N Nevada Ave, Colorado Springs, CO"},
+    {"id": "chk_lo_royal_pines", "group": "Lowes springs (1x Weekly except Fountain at 2x)", "label": "Royal pines", "address": "4252 Royal Pine Dr, Colorado Springs, CO"},
+    {"id": "chk_lo_new_center_pt", "group": "Lowes springs (1x Weekly except Fountain at 2x)", "label": "New center pt", "address": "2945 New Center Point, Colorado Springs, CO"},
+    # B Shops (1x Week)
+    {"id": "chk_b_shops_ridgeline", "group": "B Shops (1x Week)", "label": "Ridgeline Dr", "address": "11550 Ridgeline Dr Ste 110, Colorado Springs, CO 80921"},
+]
+
 SPRINGS_SITE_NOTES = {
     "csr_ks_ng": "Both Porter and Sweeping services apply at North Gate. Report discrepancies or issues to Lone Wolf.",
     "csr_lo_ncp": "Service window: Sunday or Monday (KBS). Check lumber apron and rear dock. Report discrepancies or issues to Lone Wolf.",
@@ -276,6 +316,53 @@ REGION_CONFIG = {
     },
 }
 
+
+def current_week_sunday_key() -> str:
+    """Returns the ISO date string of the most recent (or current) Sunday starting the weekly bucket."""
+    today = date.today()
+    days_since_sunday = (today.weekday() + 1) % 7
+    week_start = date.fromordinal(today.toordinal() - days_since_sunday)
+    return week_start.isoformat()
+
+
+def default_bucket_state() -> dict:
+    return {
+        "week_start": current_week_sunday_key(),
+        "checked_ids": [],
+        "last_night_emailed_ids": [],
+        "last_night_email_at": "",
+        "last_saturday_alert_week": "",
+        "custom_items": [],
+    }
+
+
+def load_springs_bucket() -> dict:
+    """Loads the weekly Check-Off Routes bucket and automatically resets if a new Sunday week started."""
+    base = default_bucket_state()
+    if os.path.exists(SPRINGS_BUCKET_FILE):
+        try:
+            with open(SPRINGS_BUCKET_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                for k, v in base.items():
+                    if k not in loaded:
+                        loaded[k] = v
+                if loaded.get("week_start") != current_week_sunday_key():
+                    return base
+                return loaded
+        except Exception:
+            pass
+    return base
+
+
+def save_springs_bucket(bucket: dict):
+    try:
+        with open(SPRINGS_BUCKET_FILE, "w", encoding="utf-8") as f:
+            json.dump(bucket, f, indent=2)
+    except Exception:
+        pass
+
+
 # --- SESSION STATE INITIALIZATION ---
 if "selected_region" not in st.session_state:
     st.session_state.selected_region = None
@@ -294,10 +381,23 @@ for reg_key, reg_data in REGION_CONFIG.items():
     st.session_state.setdefault(f"extra_temp_days_{reg_key}", [])
     st.session_state.setdefault(f"log_submitted_{reg_key}", False)
 
+if "springs_bucket" not in st.session_state:
+    st.session_state.springs_bucket = load_springs_bucket()
+elif st.session_state.springs_bucket.get("week_start") != current_week_sunday_key():
+    st.session_state.springs_bucket = default_bucket_state()
+    save_springs_bucket(st.session_state.springs_bucket)
+
 if "open_account" not in st.session_state:
     st.session_state.open_account = None
 if "open_calendar" not in st.session_state:
     st.session_state.open_calendar = None
+
+
+def get_all_springs_checkoff_items(bucket: dict) -> list[dict]:
+    items = list(SPRINGS_CHECKOFF_ITEMS)
+    for c_item in bucket.get("custom_items", []):
+        items.append(c_item)
+    return items
 
 
 def get_active_region() -> tuple[str, dict]:
@@ -797,6 +897,78 @@ def send_maintenance_email(
         server.send_message(msg)
 
 
+def send_nightly_checkoff_email(
+    tech_name: str,
+    completed_items: list[dict],
+    remaining_items: list[dict],
+    week_start: str,
+    tech_copy_email: str = "",
+):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    recipients = [recipient]
+    if tech_copy_email and tech_copy_email.strip() and tech_copy_email.strip().lower() != recipient.lower():
+        recipients.append(tech_copy_email.strip())
+
+    sender_label = tech_name.strip() if tech_name.strip() else "Springs Tech"
+    now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    done_lines = "\n".join(f"  [x] [{x['group']}] {x['label']} ({x['address']})" for x in completed_items) or "  (None)"
+    rem_lines = "\n".join(f"  [ ] [{x['group']}] {x['label']}" for x in remaining_items) or "  (All items checked off for the week)"
+
+    msg = EmailMessage()
+    msg["Subject"] = f"[Colorado Springs] Nightly Check-Off Completed ({sender_label}) — {len(completed_items)} Checked"
+    msg["From"] = sender
+    msg["To"] = ", ".join(recipients)
+    msg.set_content(
+        f"Hi Team,\n\n"
+        f"{sender_label} sent a nightly Check-Off Routes update for Colorado Springs.\n\n"
+        f"- Timestamp: {now_str}\n"
+        f"- Weekly Bucket Start (Sunday): {week_start}\n"
+        f"- Checked Off This Session ({len(completed_items)}):\n{done_lines}\n\n"
+        f"- Still Remaining in Weekly Bucket ({len(remaining_items)}):\n{rem_lines}\n"
+    )
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
+def send_saturday_unchecked_alert_email(
+    remaining_items: list[dict],
+    completed_items: list[dict],
+    week_start: str,
+):
+    smtp_host = st.secrets["email"]["smtp_host"]
+    smtp_port = int(st.secrets["email"]["smtp_port"])
+    sender = st.secrets["email"]["sender_email"]
+    password = st.secrets["email"]["sender_password"]
+    recipient = st.secrets["email"]["recipient_email"]
+
+    now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    rem_lines = "\n".join(f"  [ ] [{x['group']}] {x['label']} — {x['address']}" for x in remaining_items) or "  (None — everything is checked off!)"
+
+    msg = EmailMessage()
+    msg["Subject"] = f"[Colorado Springs] Saturday Alert: {len(remaining_items)} Unchecked Route(s) Remaining"
+    msg["From"] = sender
+    msg["To"] = recipient
+    msg.set_content(
+        f"Hi Team,\n\n"
+        f"Saturday afternoon check-off alert for Colorado Springs (Weekly Bucket started Sunday {week_start}).\n"
+        f"- Report Time: {now_str}\n"
+        f"- Completed So Far: {len(completed_items)}\n"
+        f"- Unchecked / Remaining ({len(remaining_items)}):\n{rem_lines}\n\n"
+        f"Reminder: The weekly bucket resets on Sunday for the new week.\n"
+    )
+
+    with smtplib.SMTP_SSL(smtp_host, smtp_port) as server:
+        server.login(sender, password)
+        server.send_message(msg)
+
+
 def order_stops_nearest_neighbor(stops: list[dict], home_base: dict) -> list[dict]:
     """Orders selected stops starting from the region's Home Base using nearest-neighbor routing."""
     remaining = stops.copy()
@@ -882,6 +1054,22 @@ def render_hub_page():
         )
         if st.button("Open Route Optimizer →", type="primary", use_container_width=True):
             navigate_to("route_optimizer")
+
+    # Colorado Springs Exclusive Card: Check-Off Routes
+    if reg_key == "springs":
+        bucket = st.session_state.springs_bucket
+        all_chk = get_all_springs_checkoff_items(bucket)
+        checked_set = set(bucket.get("checked_ids", []))
+        remaining_count = len([x for x in all_chk if x["id"] not in checked_set])
+        with st.container(border=True):
+            st.subheader("☑️ Check-Off Routes")
+            st.write(
+                "Weekly checkbox bucket that keeps untouched stops until cleared out, emails nightly completed work, "
+                "and sends a Saturday afternoon alert for remaining items (resets Sundays)."
+            )
+            st.caption(f"Current weekly bucket: **{len(checked_set)}** checked  •  **{remaining_count}** remaining")
+            if st.button("Open Check-Off Routes →", type="primary", use_container_width=True):
+                navigate_to("checkoff_routes")
 
     # Card 3: Vehicle & Equipment Checklist
     with st.container(border=True):
@@ -1679,6 +1867,172 @@ def render_site_directory_page():
 
 
 # ==============================================================================
+# PAGE 8: COLORADO SPRINGS CHECK-OFF ROUTES (WEEKLY BUCKET + EMAILS)
+# ==============================================================================
+def render_checkoff_routes_page():
+    reg_key, _ = get_active_region()
+    if reg_key != "springs":
+        navigate_to("hub")
+        return
+
+    bucket = st.session_state.springs_bucket
+    if bucket.get("week_start") != current_week_sunday_key():
+        st.session_state.springs_bucket = default_bucket_state()
+        save_springs_bucket(st.session_state.springs_bucket)
+        bucket = st.session_state.springs_bucket
+
+    if st.button("← Back to Colorado Springs Hub", key="top_back_chk"):
+        navigate_to("hub")
+
+    st.title("☑️ Check-Off Routes")
+    st.caption(
+        f"Weekly bucket started **Sunday {bucket['week_start']}** (auto-resets every Sunday). "
+        "Untouched stops stay in the bucket until checked off."
+    )
+
+    now_dt = datetime.now()
+    all_items = get_all_springs_checkoff_items(bucket)
+    checked_ids = set(bucket.get("checked_ids", []))
+    completed_items = [x for x in all_items if x["id"] in checked_ids]
+    remaining_items = [x for x in all_items if x["id"] not in checked_ids]
+
+    if now_dt.weekday() == 5 and now_dt.hour >= 12 and bucket.get("last_saturday_alert_week") != bucket["week_start"]:
+        try:
+            send_saturday_unchecked_alert_email(
+                remaining_items=remaining_items,
+                completed_items=completed_items,
+                week_start=bucket["week_start"],
+            )
+            bucket["last_saturday_alert_week"] = bucket["week_start"]
+            save_springs_bucket(bucket)
+            st.info(f"Saturday afternoon alert sent: **{len(remaining_items)}** unchecked route(s) remaining.")
+        except Exception:
+            pass
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total in Bucket", len(all_items))
+    m2.metric("Checked Off", len(completed_items))
+    m3.metric("Remaining", len(remaining_items))
+
+    tech_name = st.text_input("Tech Name (for Nightly Email)", value="", placeholder="Enter tech name", key="chk_tech_name")
+    copy_email = st.text_input("Copy Nightly Email to (Optional)", value="", placeholder="your.email@gmail.com", key="chk_copy_email")
+
+    st.divider()
+    st.subheader("1. Weekly Route Bucket (Check Off Completed Work)")
+    st.caption("Check off stops completed; untouched items stay in the bucket until checked off or reset on Sunday.")
+
+    live_checked_ids = []
+    for grp in SPRINGS_CHECKOFF_GROUPS:
+        grp_items = [x for x in all_items if x["group"] == grp]
+        if not grp_items:
+            continue
+        grp_done = sum(1 for x in grp_items if x["id"] in checked_ids)
+        with st.expander(f"**{grp}** ({grp_done}/{len(grp_items)} checked)", expanded=True):
+            for item in grp_items:
+                default_val = item["id"] in checked_ids
+                is_chk = st.checkbox(
+                    f"**{item['label']}**  \n`{item['address']}`",
+                    value=default_val,
+                    key=f"chk_box_{item['id']}_{bucket['week_start']}",
+                )
+                if is_chk:
+                    live_checked_ids.append(item["id"])
+
+    other_grp_items = [x for x in all_items if x["group"] not in SPRINGS_CHECKOFF_GROUPS]
+    if other_grp_items:
+        with st.expander("**Extra / Added Stops**", expanded=True):
+            for item in other_grp_items:
+                default_val = item["id"] in checked_ids
+                is_chk = st.checkbox(
+                    f"**{item['label']}**  \n`{item['address']}`",
+                    value=default_val,
+                    key=f"chk_box_{item['id']}_{bucket['week_start']}",
+                )
+                if is_chk:
+                    live_checked_ids.append(item["id"])
+
+    if sorted(live_checked_ids) != sorted(bucket.get("checked_ids", [])):
+        bucket["checked_ids"] = live_checked_ids
+        save_springs_bucket(bucket)
+        checked_ids = set(live_checked_ids)
+        completed_items = [x for x in all_items if x["id"] in checked_ids]
+        remaining_items = [x for x in all_items if x["id"] not in checked_ids]
+
+    with st.expander("➕ Add Custom Stop to This Week's Bucket"):
+        c_label = st.text_input("Stop / Task Name *", placeholder="e.g., Extra Porter Run — North Gate")
+        c_addr = st.text_input("Address *", placeholder="e.g., 2731 North Gate Blvd, Colorado Springs, CO")
+        if st.button("Add to Weekly Bucket", use_container_width=True):
+            if c_label.strip() and c_addr.strip():
+                new_id = f"chk_custom_{len(bucket.get('custom_items', [])) + 1}_{int(datetime.now().timestamp())}"
+                bucket.setdefault("custom_items", []).append(
+                    {
+                        "id": new_id,
+                        "group": "Extra / Added Stops",
+                        "label": c_label.strip(),
+                        "address": c_addr.strip(),
+                    }
+                )
+                save_springs_bucket(bucket)
+                st.rerun()
+            else:
+                st.warning("Enter both a stop/task name and an address.")
+
+    st.divider()
+    st.subheader("2. Nightly Completed Email & Saturday Unchecked Alert")
+
+    col_n, col_s = st.columns(2)
+    with col_n:
+        if st.button("📧 Email Night's Completed Work", type="primary", use_container_width=True):
+            if not completed_items:
+                st.warning("Check off at least one route item first before emailing nightly completed work.")
+            else:
+                try:
+                    send_nightly_checkoff_email(
+                        tech_name=tech_name,
+                        completed_items=completed_items,
+                        remaining_items=remaining_items,
+                        week_start=bucket["week_start"],
+                        tech_copy_email=copy_email,
+                    )
+                    bucket["last_night_emailed_ids"] = [x["id"] for x in completed_items]
+                    bucket["last_night_email_at"] = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+                    save_springs_bucket(bucket)
+                    st.success(f"Sent! Nightly completed work ({len(completed_items)} item(s)) emailed to the team.")
+                except Exception as e:
+                    st.error(f"Could not send email — check Streamlit Secrets email settings. Details: {e}")
+
+    with col_s:
+        if st.button("⚠️ Send Saturday Unchecked Alert", type="secondary", use_container_width=True):
+            try:
+                send_saturday_unchecked_alert_email(
+                    remaining_items=remaining_items,
+                    completed_items=completed_items,
+                    week_start=bucket["week_start"],
+                )
+                bucket["last_saturday_alert_week"] = bucket["week_start"]
+                save_springs_bucket(bucket)
+                st.success(f"Sent! Unchecked alert ({len(remaining_items)} remaining) emailed to the team.")
+            except Exception as e:
+                st.error(f"Could not send alert — check Streamlit Secrets email settings. Details: {e}")
+
+    if bucket.get("last_night_email_at"):
+        st.caption(f"Last nightly email sent: **{bucket['last_night_email_at']}**")
+
+    st.divider()
+    st.subheader("3. Weekly Reset (Occurs Every Sunday)")
+    st.caption("Unchecked items stay in the bucket all week; tap below if you want to uncheck all boxes for a fresh start now.")
+    if st.button("🔄 Uncheck All / Reset Weekly Bucket Now", use_container_width=True):
+        st.session_state.springs_bucket = default_bucket_state()
+        save_springs_bucket(st.session_state.springs_bucket)
+        st.success("Weekly bucket reset for a fresh start.")
+        st.rerun()
+
+    st.divider()
+    if st.button("← Back to Colorado Springs Hub", key="bottom_back_chk", use_container_width=True):
+        navigate_to("hub")
+
+
+# ==============================================================================
 # ROUTER
 # ==============================================================================
 if st.session_state.current_page == "welcome" or st.session_state.selected_region is None:
@@ -1697,3 +2051,5 @@ elif st.session_state.current_page == "maintenance_log":
     render_maintenance_log_page()
 elif st.session_state.current_page == "site_directory":
     render_site_directory_page()
+elif st.session_state.current_page == "checkoff_routes":
+    render_checkoff_routes_page()
